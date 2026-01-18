@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from application.ingestion_service import IngestionService
 from application.rag_service import RagService
+from application.weekly_report_service import WeeklyReportService
 from interface.api import schemas
-from interface.api.deps import get_ingestion_service, get_rag_service
+from interface.api.deps import get_ingestion_service, get_rag_service, get_weekly_report_service
 
 router = APIRouter()
 
@@ -36,3 +37,23 @@ def ingest(
 ) -> dict:
     service.ingest(payload.doc_id, payload.text, payload.metadata)
     return {"status": "ok"}
+
+
+@router.post("/weekly-report/generate", response_model=schemas.WeeklyReportGenerateResponse)
+def generate_weekly_report(
+    payload: schemas.WeeklyReportGenerateRequest,
+    service: WeeklyReportService = Depends(get_weekly_report_service),
+) -> schemas.WeeklyReportGenerateResponse:
+    try:
+        result = service.generate(
+            project_id=payload.project_id,
+            week_start=payload.week_start,
+            week_end=payload.week_end,
+            as_of_timestamp=payload.as_of_timestamp,
+        )
+    except NotImplementedError as exc:
+        raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc)) from exc
+    return schemas.WeeklyReportGenerateResponse(
+        weekly_report_draft=result.weekly_report_draft,
+        schedule_risk_report=result.schedule_risk_report,
+    )

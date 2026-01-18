@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -44,3 +45,15 @@ class IngestRequest(BaseModel):
     doc_id: str
     text: str
     metadata: dict = Field(default_factory=dict)
+
+
+class WeeklyReportGenerateRequest(BaseModel):
+    project_id: str = Field(..., min_length=1)
+    week_start: date
+    week_end: date
+    as_of_timestamp: datetime
+
+
+class WeeklyReportGenerateResponse(BaseModel):
+    weekly_report_draft: str
+    schedule_risk_report: str

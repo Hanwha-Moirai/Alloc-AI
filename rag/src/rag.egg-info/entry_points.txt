@@ -1,0 +1,2 @@
+[console_scripts]
+rag-api = main:run
