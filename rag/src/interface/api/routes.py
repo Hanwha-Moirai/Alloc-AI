@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from application.ingestion_service import IngestionService
 from application.rag_service import RagService
 from application.weekly_report_service import WeeklyReportService
+from infrastructure.qdrant_store import QdrantAdapter
 from interface.api import schemas
 from interface.api.deps import get_ingestion_service, get_rag_service, get_weekly_report_service
 
@@ -57,3 +58,13 @@ def generate_weekly_report(
         weekly_report_draft=result.weekly_report_draft,
         schedule_risk_report=result.schedule_risk_report,
     )
+
+
+@router.get("/health/qdrant")
+def health_qdrant() -> dict:
+    adapter = QdrantAdapter()
+    try:
+        detail = adapter.health()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Qdrant unavailable") from exc
+    return {"status": "ok", **detail}

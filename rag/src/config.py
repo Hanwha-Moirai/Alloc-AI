@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     vector_provider: str = "qdrant"
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
+    qdrant_collection: str = "rag_chunks"
 
     # Retrieval knobs
     top_k: int = 5

@@ -8,6 +8,7 @@ dependencies = [
   "uvicorn>=0.27",
   "pydantic>=2.6",
   "pydantic-settings>=2.2",
+  "qdrant-client>=1.7",
 ]
 
 [project.scripts]
