@@ -33,6 +33,8 @@ langchain-huggingface
 huggingface_hub
 sentence-transformers
 qdrant-client
+PyMuPDF
+openai
 google-ai-generativelanguage==0.6.18
 tiktoken
 EOF

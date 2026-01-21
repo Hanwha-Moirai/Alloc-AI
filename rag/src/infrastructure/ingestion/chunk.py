@@ -2,6 +2,7 @@ from typing import List
 
 
 def chunk_text(text: str, max_chars: int = 800) -> List[str]:
+    # 2단계: 파싱/청킹(naive 고정 길이)
     chunks = []
     cursor = 0
     while cursor < len(text):

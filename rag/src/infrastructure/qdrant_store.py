@@ -21,6 +21,7 @@ class QdrantAdapter:
     def search(self, query: str, k: int) -> List[SearchResult]:
         if not self._collection_exists():
             return []
+        # 4단계: 검색(쿼리 -> 벡터 검색)
         query_vector = embed_text([query])[0]
         results = self.client.search(
             collection_name=self.collection,
@@ -36,6 +37,7 @@ class QdrantAdapter:
         if len(chunks) != len(vectors):
             raise ValueError("Chunks and vectors must be the same length.")
         self._ensure_collection(len(vectors[0]))
+        # 3단계: 임베딩을 벡터 DB에 저장
         points = []
         for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             payload = {

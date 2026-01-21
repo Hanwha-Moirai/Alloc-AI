@@ -10,8 +10,11 @@ logger = logging.getLogger(__name__)
 
 class IngestionService:
     def ingest(self, doc_id: str, text: str, metadata: dict) -> None:
+        # 1/2단계: 원문 -> 청크
         chunks = chunk_text(text)
+        # 3단계: 청크 -> 임베딩
         vectors = embed_text(chunks)
+        # 3단계: 임베딩 -> 벡터 DB 저장
         index_embeddings(doc_id, chunks, vectors, metadata)
 
     def ingest_docs_dir(self, docs_dir: str) -> None:

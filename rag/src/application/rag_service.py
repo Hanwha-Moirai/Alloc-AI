@@ -25,12 +25,14 @@ class RagService:
 
     def search(self, query: str, top_k: Optional[int] = None) -> List[SearchResult]:
         k = top_k or settings.top_k
+        # 4/5단계: 검색 -> 재정렬
         raw = self._vector_store.search(query, k=settings.rerank_k)
         ranked = self._reranker.rerank(query, raw, top_k=k)
         return self._enrich(ranked)
 
     def answer(self, query: str, top_k: Optional[int] = None) -> tuple[str, List[SearchResult]]:
         results = self.search(query, top_k=top_k)
+        # 6단계: 생성(프롬프트 + 컨텍스트)
         prompt = self._prompt_builder.build(query, results)
         self._safety.ensure_safe(prompt)
         response = self._llm.generate(prompt)
