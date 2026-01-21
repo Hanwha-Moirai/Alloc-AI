@@ -5,14 +5,29 @@ from typing import Any, Optional
 from config import settings
 
 _local_model: Optional[Any] = None
+_openai_client: Optional[Any] = None
 
 
 class LLMClient:
     def generate(self, prompt: str) -> str:
+        if settings.llm_provider == "openai":
+            return self._generate_openai(prompt)
         if settings.llm_provider == "local":
             return self._generate_local(prompt)
         # Stub client: replace with real provider implementation.
         return "Stub response based on prompt."
+
+    def _generate_openai(self, prompt: str) -> str:
+        if not settings.openai_api_key:
+            raise ValueError("RAG_OPENAI_API_KEY must be set for OpenAI usage.")
+        client = self._get_openai_client()
+        response = client.chat.completions.create(
+            model=settings.openai_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=settings.llm_max_tokens,
+            temperature=settings.llm_temperature,
+        )
+        return response.choices[0].message.content or ""
 
     def _generate_local(self, prompt: str) -> str:
         if not settings.llm_model_path:
@@ -39,3 +54,16 @@ class LLMClient:
                 n_ctx=settings.max_context_tokens,
             )
         return _local_model
+
+    def _get_openai_client(self) -> Any:
+        global _openai_client
+        if _openai_client is None:
+            try:
+                from openai import OpenAI
+            except ImportError as exc:
+                raise RuntimeError("openai package is required for OpenAI usage. Install it and retry.") from exc
+            client_kwargs = {"api_key": settings.openai_api_key}
+            if settings.openai_base_url:
+                client_kwargs["base_url"] = settings.openai_base_url
+            _openai_client = OpenAI(**client_kwargs)
+        return _openai_client
