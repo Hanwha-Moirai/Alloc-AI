@@ -6,16 +6,26 @@ from config import settings
 
 _local_model: Optional[Any] = None
 _openai_client: Optional[Any] = None
+_gemini_model: Optional[Any] = None
 
 
 class LLMClient:
     def generate(self, prompt: str) -> str:
+        if settings.llm_provider == "gemini":
+            return self._generate_gemini(prompt)
         if settings.llm_provider == "openai":
             return self._generate_openai(prompt)
         if settings.llm_provider == "local":
             return self._generate_local(prompt)
         # Stub client: replace with real provider implementation.
         return "Stub response based on prompt."
+
+    def _generate_gemini(self, prompt: str) -> str:
+        if not settings.gemini_api_key:
+            raise ValueError("RAG_GEMINI_API_KEY must be set for Gemini usage.")
+        model = self._get_gemini_model()
+        response = model.generate_content(prompt)
+        return response.text or ""
 
     def _generate_openai(self, prompt: str) -> str:
         if not settings.openai_api_key:
@@ -67,3 +77,16 @@ class LLMClient:
                 client_kwargs["base_url"] = settings.openai_base_url
             _openai_client = OpenAI(**client_kwargs)
         return _openai_client
+
+    def _get_gemini_model(self) -> Any:
+        global _gemini_model
+        if _gemini_model is None:
+            try:
+                import google.generativeai as genai
+            except ImportError as exc:
+                raise RuntimeError(
+                    "google-generativeai is required for Gemini usage. Install it and retry."
+                ) from exc
+            genai.configure(api_key=settings.gemini_api_key)
+            _gemini_model = genai.GenerativeModel(settings.gemini_model)
+        return _gemini_model
