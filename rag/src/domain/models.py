@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, Any, List
 
 
@@ -17,4 +18,5 @@ class RiskAnalysisResult:
     impact: int
     summary: str
     rationale: str
+    generated_at: datetime
     citations: List[Dict[str, str]] = field(default_factory=list)

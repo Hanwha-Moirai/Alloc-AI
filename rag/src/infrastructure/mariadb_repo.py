@@ -129,7 +129,6 @@ class MariaDBRepository:
             "citations_json, created_at) "
             "VALUES (:project_id, :likelihood, :impact, :summary_text, :rationale_text, :citations_json, :created_at)"
         )
-        now = datetime.utcnow()
         citations_json = json.dumps(result.citations, ensure_ascii=False)
         try:
             self._execute(
@@ -141,7 +140,7 @@ class MariaDBRepository:
                     "summary_text": result.summary,
                     "rationale_text": result.rationale,
                     "citations_json": citations_json,
-                    "created_at": now,
+                    "created_at": result.generated_at,
                 },
             )
         except Exception as exc:

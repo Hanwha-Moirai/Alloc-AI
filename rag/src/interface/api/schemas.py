@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -64,4 +64,5 @@ class RiskReportResponse(BaseModel):
     impact: int
     summary: str
     rationale: str
+    generated_at: datetime
     citations: List[RiskCitation]

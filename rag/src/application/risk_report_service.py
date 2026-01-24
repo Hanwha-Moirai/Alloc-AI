@@ -51,12 +51,14 @@ class RiskReportService:
         summary = str(parsed.get("summary", "")).strip() or "요약을 생성하지 못했습니다."
         rationale = str(parsed.get("rationale", "")).strip() or "근거를 생성하지 못했습니다."
 
+        generated_at = datetime.utcnow()
         result = RiskAnalysisResult(
             project_id=project_id,
             likelihood=likelihood,
             impact=impact,
             summary=summary,
             rationale=rationale,
+            generated_at=generated_at,
             citations=citations,
         )
         self._repo.save_risk_analysis(result)

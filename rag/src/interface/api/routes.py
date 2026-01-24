@@ -61,6 +61,7 @@ def generate_risk_report(
         impact=result.impact,
         summary=result.summary,
         rationale=result.rationale,
+        generated_at=result.generated_at,
         citations=[schemas.RiskCitation(**item) for item in result.citations],
     )
 
