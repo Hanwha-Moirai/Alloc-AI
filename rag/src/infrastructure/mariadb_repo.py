@@ -4,8 +4,10 @@ import json
 import logging
 from datetime import date, datetime
 from typing import Any, Dict, List
+from urllib.parse import quote_plus
 
-import pymysql
+from sqlalchemy import bindparam, create_engine, text
+from sqlalchemy.engine import Engine
 
 from config import settings
 from domain.models import RiskAnalysisResult
@@ -14,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class MariaDBRepository:
+    _engine: Engine | None = None
+
     def __init__(self, dsn: str = "") -> None:
         self.dsn = dsn or self._build_dsn()
 
@@ -26,9 +30,9 @@ class MariaDBRepository:
         sql = (
             "SELECT project_id, name, start_date, end_date, project_status, "
             "project_type, description, predicted_cost, partners "
-            "FROM project WHERE project_id = %s"
+            "FROM project WHERE project_id = :project_id"
         )
-        rows = self._query(sql, (project_id,))
+        rows = self._query(sql, {"project_id": project_id})
         return rows[0] if rows else {}
 
     def fetch_weekly_reports(self, project_id: str, week_start: date, week_end: date) -> List[Dict[str, Any]]:
@@ -36,10 +40,13 @@ class MariaDBRepository:
             "SELECT report_id, project_id, week_start_date, week_end_date, report_status, "
             "change_of_plan, summary_text, task_completion_rate "
             "FROM weekly_report "
-            "WHERE project_id = %s AND is_deleted = 0 "
-            "AND week_start_date >= %s AND week_end_date <= %s"
+            "WHERE project_id = :project_id AND is_deleted = 0 "
+            "AND week_start_date >= :week_start AND week_end_date <= :week_end"
         )
-        return self._query(sql, (project_id, week_start, week_end))
+        return self._query(
+            sql,
+            {"project_id": project_id, "week_start": week_start, "week_end": week_end},
+        )
 
     def fetch_meeting_records(
         self, project_id: str, start_dt: datetime, end_dt: datetime
@@ -47,17 +54,17 @@ class MariaDBRepository:
         meetings = self._query(
             "SELECT meeting_id, project_id, created_by, progress, meeting_date, meeting_time "
             "FROM meeting_record "
-            "WHERE project_id = %s AND is_deleted = 0 AND meeting_date BETWEEN %s AND %s",
-            (project_id, start_dt, end_dt),
+            "WHERE project_id = :project_id AND is_deleted = 0 AND meeting_date BETWEEN :start_dt AND :end_dt",
+            {"project_id": project_id, "start_dt": start_dt, "end_dt": end_dt},
         )
         if not meetings:
             return []
         meeting_ids = [row["meeting_id"] for row in meetings]
-        placeholders = ", ".join(["%s"] * len(meeting_ids))
         agenda_rows = self._query(
-            f"SELECT meeting_id, discussion_title, discussion_content, discussion_result, agenda_type "
-            f"FROM agenda WHERE meeting_id IN ({placeholders})",
-            tuple(meeting_ids),
+            "SELECT meeting_id, discussion_title, discussion_content, discussion_result, agenda_type "
+            "FROM agenda WHERE meeting_id IN :meeting_ids",
+            {"meeting_ids": meeting_ids},
+            expanding_params={"meeting_ids": meeting_ids},
         )
         agendas_by_meeting: Dict[int, List[Dict[str, Any]]] = {}
         for row in agenda_rows:
@@ -83,9 +90,9 @@ class MariaDBRepository:
             "l.before_start_date, l.after_start_date, l.before_end_date, l.after_end_date, l.created_at "
             "FROM events_log l "
             "JOIN events e ON e.event_id = l.event_id "
-            "WHERE e.project_id = %s AND l.created_at BETWEEN %s AND %s"
+            "WHERE e.project_id = :project_id AND l.created_at BETWEEN :start_dt AND :end_dt"
         )
-        return self._query(sql, (project_id, start_dt, end_dt))
+        return self._query(sql, {"project_id": project_id, "start_dt": start_dt, "end_dt": end_dt})
 
     def fetch_task_update_logs(
         self, project_id: str, start_dt: datetime, end_dt: datetime
@@ -95,9 +102,9 @@ class MariaDBRepository:
             "FROM task_update_log l "
             "JOIN task t ON t.task_id = l.task_id "
             "JOIN milestone m ON m.milestone_id = t.milestone_id "
-            "WHERE m.project_id = %s AND l.created_at BETWEEN %s AND %s"
+            "WHERE m.project_id = :project_id AND l.created_at BETWEEN :start_dt AND :end_dt"
         )
-        return self._query(sql, (project_id, start_dt, end_dt))
+        return self._query(sql, {"project_id": project_id, "start_dt": start_dt, "end_dt": end_dt})
 
     def fetch_milestone_update_logs(
         self, project_id: str, start_dt: datetime, end_dt: datetime
@@ -106,68 +113,75 @@ class MariaDBRepository:
             "SELECT l.milestone_update_log_id, l.milestone_id, l.update_reason, l.created_at "
             "FROM milestone_update_log l "
             "JOIN milestone m ON m.milestone_id = l.milestone_id "
-            "WHERE m.project_id = %s AND l.created_at BETWEEN %s AND %s"
+            "WHERE m.project_id = :project_id AND l.created_at BETWEEN :start_dt AND :end_dt"
         )
-        return self._query(sql, (project_id, start_dt, end_dt))
+        return self._query(sql, {"project_id": project_id, "start_dt": start_dt, "end_dt": end_dt})
 
     def fetch_project_documents(self, project_id: str) -> List[Dict[str, Any]]:
         _ = project_id
         # project_document에는 project_id가 없어서 전체 문서를 반환
         sql = "SELECT doc_id, file_path, extracted_text, uploaded_at FROM project_document"
-        return self._query(sql, ())
+        return self._query(sql, {})
 
     def save_risk_analysis(self, result: RiskAnalysisResult) -> None:
         sql = (
             "INSERT INTO risk_analysis (project_id, likelihood, impact, summary_text, rationale_text, "
             "citations_json, created_at) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            "VALUES (:project_id, :likelihood, :impact, :summary_text, :rationale_text, :citations_json, :created_at)"
         )
         now = datetime.utcnow()
         citations_json = json.dumps(result.citations, ensure_ascii=False)
         try:
             self._execute(
                 sql,
-                (
-                    result.project_id,
-                    result.likelihood,
-                    result.impact,
-                    result.summary,
-                    result.rationale,
-                    citations_json,
-                    now,
-                ),
+                {
+                    "project_id": result.project_id,
+                    "likelihood": result.likelihood,
+                    "impact": result.impact,
+                    "summary_text": result.summary,
+                    "rationale_text": result.rationale,
+                    "citations_json": citations_json,
+                    "created_at": now,
+                },
             )
         except Exception as exc:
             logger.warning("Failed to save risk analysis result: %s", exc)
 
     def _build_dsn(self) -> str:
+        password = quote_plus(settings.mariadb_password)
         return (
-            f"mariadb://{settings.mariadb_user}:{settings.mariadb_password}"
+            f"mariadb+pymysql://{settings.mariadb_user}:{password}"
             f"@{settings.mariadb_host}:{settings.mariadb_port}/{settings.mariadb_database}"
         )
 
-    def _query(self, sql: str, params: tuple) -> List[Dict[str, Any]]:
-        return self._execute(sql, params, fetch=True)
+    def _query(
+        self, sql: str, params: dict[str, Any], expanding_params: dict[str, List[Any]] | None = None
+    ) -> List[Dict[str, Any]]:
+        return self._execute(sql, params, fetch=True, expanding_params=expanding_params)
 
-    def _execute(self, sql: str, params: tuple, fetch: bool = False) -> Any:
+    def _execute(
+        self,
+        sql: str,
+        params: dict[str, Any],
+        fetch: bool = False,
+        expanding_params: dict[str, List[Any]] | None = None,
+    ) -> Any:
         self._ensure_credentials()
-        conn = pymysql.connect(
-            host=settings.mariadb_host,
-            user=settings.mariadb_user,
-            password=settings.mariadb_password,
-            database=settings.mariadb_database,
-            port=settings.mariadb_port,
-            cursorclass=pymysql.cursors.DictCursor,
-            autocommit=True,
-        )
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(sql, params)
-                if fetch:
-                    return list(cursor.fetchall())
-        finally:
-            conn.close()
-        return None
+        statement = text(sql)
+        if expanding_params:
+            for key in expanding_params.keys():
+                statement = statement.bindparams(bindparam(key, expanding=True))
+        engine = self._get_engine()
+        with engine.begin() as conn:
+            result = conn.execute(statement, params)
+            if fetch:
+                return [dict(row) for row in result.mappings().all()]
+        return []
+
+    def _get_engine(self) -> Engine:
+        if MariaDBRepository._engine is None:
+            MariaDBRepository._engine = create_engine(self.dsn, pool_pre_ping=True)
+        return MariaDBRepository._engine
 
     def _ensure_credentials(self) -> None:
         missing = []

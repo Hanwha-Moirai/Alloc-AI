@@ -38,6 +38,7 @@ openai
 google-ai-generativelanguage==0.6.18
 google-generativeai
 pymysql
+sqlalchemy
 tiktoken
 EOF
 )
