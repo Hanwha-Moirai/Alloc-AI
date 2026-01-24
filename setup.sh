@@ -7,6 +7,7 @@ sudo apt install -y \
     python3-pip \
     python3-venv \
     poppler-utils \
+    libmariadb-dev \
     git \
     curl \
     unzip \
@@ -14,10 +15,10 @@ sudo apt install -y \
 
 echo "2. 프로젝트용 Python 가상환경 생성"
 python3 -m venv venv
-source ./venv/bin/activate
+. ./venv/bin/activate
 
 echo "3. Python 패키지 의존성 설치"
-pip install --upgrade pips
+pip install --upgrade pip
 
 # 설치할 패키지 리스트
 REQUIREMENTS=$(cat <<EOF
@@ -35,7 +36,6 @@ sentence-transformers
 qdrant-client
 PyMuPDF
 openai
-google-ai-generativelanguage==0.6.18
 google-generativeai
 MariaDB
 sqlalchemy
