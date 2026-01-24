@@ -150,7 +150,7 @@ class MariaDBRepository:
     def _build_dsn(self) -> str:
         password = quote_plus(settings.mariadb_password)
         return (
-            f"mariadb+pymysql://{settings.mariadb_user}:{password}"
+            f"mariadb+mariadbconnector://{settings.mariadb_user}:{password}"
             f"@{settings.mariadb_host}:{settings.mariadb_port}/{settings.mariadb_database}"
         )
 
