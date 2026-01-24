@@ -4,6 +4,7 @@ import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from zoneinfo import ZoneInfo
 from typing import Any, Dict, List
 
 from domain.models import RiskAnalysisResult
@@ -51,7 +52,7 @@ class RiskReportService:
         summary = str(parsed.get("summary", "")).strip() or "요약을 생성하지 못했습니다."
         rationale = str(parsed.get("rationale", "")).strip() or "근거를 생성하지 못했습니다."
 
-        generated_at = datetime.utcnow()
+        generated_at = datetime.now(ZoneInfo("Asia/Seoul"))
         result = RiskAnalysisResult(
             project_id=project_id,
             likelihood=likelihood,

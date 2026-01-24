@@ -45,4 +45,4 @@
 
 9) 응답 반환
 - 파일: `rag/src/interface/api/routes.py`
-- `RiskReportResponse` JSON 응답 반환 (generated_at 포함)
+- `RiskReportResponse` JSON 응답 반환 (generated_at은 Asia/Seoul 기준)
