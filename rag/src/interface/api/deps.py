@@ -2,7 +2,7 @@ from application.ingestion_service import IngestionService
 from application.prompt_builder import DefaultPromptBuilder
 from application.rag_service import RagService
 from application.safety import DefaultSafetyPolicy
-from application.weekly_report_service import WeeklyReportService
+from application.risk_report_service import RiskReportService
 from infrastructure.llm_client import LLMClient
 from infrastructure.mariadb_repo import MariaDBRepository
 from infrastructure.qdrant_store import QdrantAdapter
@@ -24,5 +24,5 @@ def get_ingestion_service() -> IngestionService:
     return IngestionService()
 
 
-def get_weekly_report_service() -> WeeklyReportService:
-    return WeeklyReportService()
+def get_risk_report_service() -> RiskReportService:
+    return RiskReportService()

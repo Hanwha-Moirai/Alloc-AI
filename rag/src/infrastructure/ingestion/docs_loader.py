@@ -14,20 +14,20 @@ class DocumentPayload:
     metadata: dict
 
 
-def load_pdfs_from_dir(docs_dir: str) -> List[DocumentPayload]:
-    base = Path(docs_dir).resolve()
+def load_pdfs_from_dir(data_dir: str) -> List[DocumentPayload]:
+    base = Path(data_dir).resolve()
     if not base.exists():
-        raise FileNotFoundError(f"Docs directory not found: {docs_dir}")
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
 
     # 1단계: 문서 인입(원문 PDF)
     pdf_paths = sorted(base.rglob("*.pdf"))
     return [load_pdf(path, base) for path in pdf_paths]
 
 
-def iter_pdfs_from_dir(docs_dir: str) -> Iterable[DocumentPayload]:
-    base = Path(docs_dir).resolve()
+def iter_pdfs_from_dir(data_dir: str) -> Iterable[DocumentPayload]:
+    base = Path(data_dir).resolve()
     if not base.exists():
-        raise FileNotFoundError(f"Docs directory not found: {docs_dir}")
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
     # 1단계: 문서 인입(원문 PDF)
     for path in sorted(base.rglob("*.pdf")):
         yield load_pdf(path, base)

@@ -17,12 +17,12 @@ class IngestionService:
         # 3단계: 임베딩 -> 벡터 DB 저장
         index_embeddings(doc_id, chunks, vectors, metadata)
 
-    def ingest_docs_dir(self, docs_dir: str) -> None:
+    def ingest_data_dir(self, data_dir: str) -> None:
         saw_any = False
-        for payload in iter_pdfs_from_dir(docs_dir):
+        for payload in iter_pdfs_from_dir(data_dir):
             saw_any = True
             if not payload.text:
                 continue
             self.ingest(payload.doc_id, payload.text, payload.metadata)
         if not saw_any:
-            logger.warning("No PDF files found under docs dir: %s", docs_dir)
+            logger.warning("No PDF files found under data dir: %s", data_dir)

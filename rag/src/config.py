@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -6,6 +8,7 @@ class Settings(BaseSettings):
 
     app_name: str = "rag"
     environment: str = "dev"
+    data_dir: str = str(Path(__file__).resolve().parents[1] / "data")
 
     # Vector store
     vector_provider: str = "qdrant"

@@ -1,99 +1,96 @@
 # Qdrant 사용 방식 (RAG 관점)
 
-이 문서는 이 저장소에서 Qdrant를 RAG 파이프라인에 어떻게 사용하는지에 대한 구현 방식을 정리한다.
+이 문서는 Alloc-AI RAG 서비스에서 Qdrant를 사용하는 흐름을 실제 코드 기준으로 정리한다.
 
-## 1) 벡터 저장소 생성
-- **벡터스토어 정의**: `app/chains/vector_store.py`
-  - 임베딩: `sentence-transformers/all-MiniLM-L6-v2`
-  - Qdrant 컬렉션: `fp_examples`
-  - 클라이언트: `QdrantClient(host=QDRANT_HOST, port=6333)`
-  - LangChain `Qdrant` 벡터스토어로 래핑
+## 1) 벡터 저장소 설정
+- **설정 파일**: `rag/src/config.py`
+  - `RAG_QDRANT_URL`: Qdrant 접속 URL (기본값: `http://localhost:6333`)
+  - `RAG_QDRANT_API_KEY`: API Key (필요 시)
+  - `RAG_QDRANT_COLLECTION`: 컬렉션 이름 (기본값: `rag_chunks`)
 
 ```python
-embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-client = QdrantClient(host=qdrant_host, port=6333)
-vectorstore = Qdrant(
-    client=client,
-    collection_name="fp_examples",
-    embeddings=embedding
+class Settings(BaseSettings):
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""
+    qdrant_collection: str = "rag_chunks"
+```
+
+## 2) Qdrant 어댑터 초기화
+- **구현 위치**: `rag/src/infrastructure/qdrant_store.py`
+- **동작**:
+  - `QdrantClient(url=..., api_key=...)`로 연결
+  - 컬렉션 이름은 설정값 사용
+
+```python
+class QdrantAdapter:
+    def __init__(self) -> None:
+        self.url = settings.qdrant_url
+        self.api_key = settings.qdrant_api_key
+        self.collection = settings.qdrant_collection
+        self.client = QdrantClient(url=self.url, api_key=self.api_key or None)
+```
+
+## 3) 벡터 업서트(적재)
+- **호출 경로**:
+  - `rag/src/application/ingestion_service.py` → `rag/src/infrastructure/ingestion/index.py`
+  - `index_embeddings()`에서 `QdrantAdapter.upsert()` 호출
+- **업서트 규칙**:
+  - `doc_id`, `chunk_index`, `text`, `metadata`를 payload로 저장
+  - point id는 `{doc_id}:{chunk_index}`
+  - 컬렉션이 없으면 자동 생성 (벡터 차원 기반)
+
+```python
+point_id = f"{doc_id}:{idx}"
+payload = {"doc_id": doc_id, "chunk_index": idx, "text": chunk, "metadata": metadata}
+```
+
+## 4) 검색 흐름
+- **서비스 진입**: `rag/src/application/rag_service.py`
+  - `RagService.search()`에서 `VectorStore.search()` 호출
+- **Qdrant 검색**: `rag/src/infrastructure/qdrant_store.py`
+  - 쿼리를 임베딩한 후 `client.search()` 수행
+  - `SearchResult`로 매핑하여 반환
+
+```python
+results = self.client.search(
+    collection_name=self.collection,
+    query_vector=query_vector,
+    limit=k,
+    with_payload=True,
 )
 ```
 
-## 2) 데이터 적재(벡터 업로드)
-### 2-1. 서버 시작 시 자동 적재
-- **진입점**: `main.py` → `startup_event()`
-- **동작**: 서버 시작 시 `process_and_upload_to_qdrant()`를 호출하여 컬렉션을 재생성 후 업로드
+## 5) 임베딩 생성
+- **임베더 위치**: `rag/src/infrastructure/ingestion/embed.py`
+- **현재 상태**: 스텁 임베더 (실제 모델로 교체 필요)
 
 ```python
-@app.on_event("startup")
-async def startup_event():
-    await process_and_upload_to_qdrant()
+def embed_text(texts: List[str]) -> List[List[float]]:
+    return [[0.0] * 4 for _ in texts]
 ```
 
-### 2-2. PDF 기반 예시 생성 후 업로드
-- **스크립트**: `app/scripts/fp_generate_embedding.py`
-- **흐름**:
-  1) PDF 요구사항 문서에서 문장 추출
-  2) LLM으로 각 문장을 FP 예시(JSON)로 변환
-  3) `description`을 `page_content`로 `Document` 생성
-  4) Qdrant 컬렉션 `fp_examples`에 업로드
+## 6) 문서 적재 (PDF 기준, naive)
+- **로더 위치**: `rag/src/infrastructure/ingestion/docs_loader.py`
+- **동작**:
+  - `data/` 하위 PDF를 순회하며 텍스트 추출
+  - 페이지 텍스트를 단순 연결 후 chunking/업서트
+  - `doc_id`는 `docs` 기준 상대 경로를 사용
+- **호출 위치**: `rag/src/application/ingestion_service.py`
 
 ```python
-client.recreate_collection(
-    collection_name="fp_examples",
-    vectors_config={"size": 384, "distance": "Cosine"}
-)
-vectorstore.add_documents(documents)
+service = IngestionService()
+service.ingest_data_dir("data")
 ```
 
-### 2-3. API를 통한 수동 업로드
-- **API**: `app/api/fp_embed.py`
-- **동작**: 입력 리스트를 `Document`로 변환 후 `vectorstore.add_documents()`로 저장
+### 6-1. PDF 업로드 API (원문 적재 전 단계)
+- **엔드포인트**: `POST /upload/pdf`
+- **동작**: 업로드된 PDF를 `data/` 디렉터리에 저장
+- **구현 위치**: `rag/src/interface/api/routes.py`
 
-```python
-vectorstore.add_documents(documents)
-```
-
-## 3) RAG 검색 설정
-- **리트리버 정의**: `app/chains/retriever.py`
-- **검색 설정**:
-  - `search_type`: `similarity_score_threshold`
-  - `score_threshold`: `0.8`
-  - `k`: `1`
-
-```python
-retriever = vectorstore.as_retriever(
-    search_type="similarity_score_threshold",
-    search_kwargs={"score_threshold": 0.8, "k": 1}
-)
-```
-
-## 4) RAG 체인 구성
-- **체인 정의**: `app/chains/chains.py`
-- **구성**: `RetrievalQA` 사용
-- **입력**: 질문(`query`) + 검색된 문맥(`context`)을 프롬프트에 주입
-
-```python
-rag_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    chain_type="stuff",
-    chain_type_kwargs={"prompt": prompt_template}
-)
-```
-
-## 5) RAG 호출 위치
-- **서비스**: `app/services/fp_inference_service.py`
-- **사용 방식**: OCR 문장(`ocr_text`)을 질문으로 전달해 RAG 호출
-
-```python
-raw_output = await asyncio.to_thread(rag_chain.invoke, {"query": ocr_text})
-```
-
-## 참고: Qdrant 연결 확인
-- **헬스 체크**: `app/api/qdrant_test.py`
-- `/ping-qdrant`에서 `get_collections()` 호출
-
-```python
-result = qdrant_client.get_collections()
-```
+## 7) 연결 확인 (운영 체크)
+### 6-1. 헬스 체크 API
+- **엔드포인트**: `GET /health/qdrant`
+- **구현 위치**: `rag/src/interface/api/routes.py`
+- **동작**:
+  - `QdrantAdapter.health()`로 컬렉션 목록과 존재 여부 확인
+  - 연결 실패 시 `503` 반환
