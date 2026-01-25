@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import concurrent.futures
 import logging
 import time as time_module
 from typing import Any, Optional
+
+import requests
 
 from config import settings
 
@@ -28,7 +29,6 @@ class LLMClient:
     def _generate_gemini(self, prompt: str) -> str:
         if not settings.gemini_api_key:
             raise ValueError("RAG_GEMINI_API_KEY must be set for Gemini usage.")
-        client = self._get_gemini_client()
         timeout_s = settings.llm_timeout_seconds
         logger.info(
             "Gemini request start model=%s prompt_chars=%d timeout_s=%s",
@@ -37,22 +37,33 @@ class LLMClient:
             timeout_s,
         )
         started = time_module.perf_counter()
-
-        def _call() -> Any:
-            return client.models.generate_content(model=settings.gemini_model, contents=prompt)
-
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{settings.gemini_model}:generateContent"
+        )
+        headers = {
+            "Content-Type": "application/json",
+            "X-goog-api-key": settings.gemini_api_key,
+        }
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_call)
-                response = future.result(timeout=timeout_s)
-        except concurrent.futures.TimeoutError as exc:
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
+            response.raise_for_status()
+        except requests.Timeout as exc:
             logger.warning("Gemini request timeout after %s seconds", timeout_s)
             raise TimeoutError("Gemini request timed out.") from exc
         finally:
             elapsed = time_module.perf_counter() - started
             logger.info("Gemini request end elapsed_ms=%.2f", elapsed * 1000)
 
-        return response.text or ""
+        data = response.json()
+        candidates = data.get("candidates") or []
+        if not candidates:
+            return ""
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            return ""
+        return parts[0].get("text", "") or ""
 
     def _generate_openai(self, prompt: str) -> str:
         if not settings.openai_api_key:
