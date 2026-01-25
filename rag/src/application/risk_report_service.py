@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List
 
@@ -33,6 +33,9 @@ class RiskReportService:
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
         start_dt = datetime.combine(week_start, time.min)
         end_dt = datetime.combine(week_end, time.max)
+        if settings.environment.lower() == "test":
+            end_dt = min(end_dt, datetime.now())
+            start_dt = max(start_dt, end_dt - timedelta(days=2))
         context = RiskReportContext(
             project=self._repo.fetch_project(project_id),
             weekly_reports=self._repo.fetch_weekly_reports(project_id, week_start, week_end),
@@ -42,6 +45,8 @@ class RiskReportService:
             milestone_update_logs=self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt),
             project_documents=self._repo.fetch_project_documents(project_id),
         )
+        if settings.environment.lower() == "test":
+            context = self._apply_test_limits(context)
         citations = self._build_citations(context)
         prompt = self._build_prompt(context, citations)
         raw = self._llm.generate(prompt)
@@ -64,6 +69,46 @@ class RiskReportService:
         )
         self._repo.save_risk_analysis(result)
         return result
+
+    def _apply_test_limits(self, context: RiskReportContext) -> RiskReportContext:
+        max_docs = 5
+        max_chars = 800
+        return RiskReportContext(
+            project=context.project,
+            weekly_reports=[self._trim_weekly_report(item, max_chars) for item in context.weekly_reports[:max_docs]],
+            meeting_records=[self._trim_meeting_record(item, max_chars) for item in context.meeting_records[:max_docs]],
+            events_logs=[self._trim_text_field(item, "log_description", max_chars) for item in context.events_logs[:max_docs]],
+            task_update_logs=[self._trim_text_field(item, "update_reason", max_chars) for item in context.task_update_logs[:max_docs]],
+            milestone_update_logs=[
+                self._trim_text_field(item, "update_reason", max_chars)
+                for item in context.milestone_update_logs[:max_docs]
+            ],
+            project_documents=[
+                self._trim_text_field(item, "extracted_text", max_chars) for item in context.project_documents[:max_docs]
+            ],
+        )
+
+    def _trim_weekly_report(self, item: Dict[str, Any], max_chars: int) -> Dict[str, Any]:
+        trimmed = dict(item)
+        trimmed["summary_text"] = self._truncate_text(trimmed.get("summary_text"), max_chars)
+        trimmed["change_of_plan"] = self._truncate_text(trimmed.get("change_of_plan"), max_chars)
+        return trimmed
+
+    def _trim_meeting_record(self, item: Dict[str, Any], max_chars: int) -> Dict[str, Any]:
+        trimmed = dict(item)
+        trimmed["agenda_summary"] = self._truncate_text(trimmed.get("agenda_summary"), max_chars)
+        return trimmed
+
+    def _trim_text_field(self, item: Dict[str, Any], key: str, max_chars: int) -> Dict[str, Any]:
+        trimmed = dict(item)
+        trimmed[key] = self._truncate_text(trimmed.get(key), max_chars)
+        return trimmed
+
+    def _truncate_text(self, value: Any, max_chars: int) -> str:
+        text = str(value or "").strip().replace("\n", " ")
+        if len(text) > max_chars:
+            return text[:max_chars] + "..."
+        return text
 
     def _build_prompt(self, context: RiskReportContext, citations: List[Dict[str, str]]) -> str:
         return (

@@ -10,6 +10,7 @@
 2) 주간 범위 확정
 - 파일: `rag/src/application/risk_report_service.py`
 - `week_start`, `week_end`를 `datetime` 범위로 변환
+- TEST 모드(`RAG_ENVIRONMENT=TEST`)에서는 최근 2일 범위로 축소
 
 3) MariaDB 문서/메타 수집
 - 파일: `rag/src/infrastructure/mariadb_repo.py`
