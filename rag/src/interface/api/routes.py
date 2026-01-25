@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
@@ -12,6 +13,7 @@ from interface.api import schemas
 from interface.api.deps import get_ingestion_service, get_rag_service, get_risk_report_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 검색/생성/적재 API 라우팅 모음
 @router.post("/search", response_model=schemas.SearchResponse)
@@ -54,6 +56,7 @@ def generate_risk_report(
     service: RiskReportService = Depends(get_risk_report_service),
 ) -> schemas.RiskReportResponse:
     # PI 매트릭스 기반 리스크 분석 요청 처리
+    logger.info("RiskReport request project_id=%s week_start=%s week_end=%s", project_id, payload.week_start, payload.week_end)
     result = service.generate(project_id=project_id, week_start=payload.week_start, week_end=payload.week_end)
     return schemas.RiskReportResponse(
         project_id=project_id,

@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 
 from config import settings
@@ -5,6 +7,8 @@ from interface.api.routes import router as api_router
 
 
 def create_app() -> FastAPI:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     app = FastAPI(title=settings.app_name)
     app.include_router(api_router)
     return app
