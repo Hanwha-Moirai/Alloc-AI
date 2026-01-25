@@ -149,14 +149,14 @@ class RiskReportService:
             "문서 기반 정성 분석은 LLM이 잘하기 때문에 RAG로 근거를 요약한다.\n\n"
             "응답은 JSON만 출력하고, 다음 키를 포함하라:\n"
             '{"likelihood": 1, "impact": 1, "summary": "...", "rationale": "..."}\n\n'
-            f"[프로젝트 메타]\n{json.dumps(context.project, ensure_ascii=False)}\n\n"
-            f"[주간 보고]\n{json.dumps(context.weekly_reports, ensure_ascii=False)}\n\n"
-            f"[회의록]\n{json.dumps(context.meeting_records, ensure_ascii=False)}\n\n"
-            f"[일정 변경 로그]\n{json.dumps(context.events_logs, ensure_ascii=False)}\n\n"
-            f"[태스크 변경 로그]\n{json.dumps(context.task_update_logs, ensure_ascii=False)}\n\n"
-            f"[마일스톤 변경 로그]\n{json.dumps(context.milestone_update_logs, ensure_ascii=False)}\n\n"
-            f"[프로젝트 문서]\n{json.dumps(context.project_documents, ensure_ascii=False)}\n\n"
-            f"[참고 문서 목록]\n{json.dumps(citations, ensure_ascii=False)}\n"
+            f"[프로젝트 메타]\n{json.dumps(context.project, ensure_ascii=False, default=str)}\n\n"
+            f"[주간 보고]\n{json.dumps(context.weekly_reports, ensure_ascii=False, default=str)}\n\n"
+            f"[회의록]\n{json.dumps(context.meeting_records, ensure_ascii=False, default=str)}\n\n"
+            f"[일정 변경 로그]\n{json.dumps(context.events_logs, ensure_ascii=False, default=str)}\n\n"
+            f"[태스크 변경 로그]\n{json.dumps(context.task_update_logs, ensure_ascii=False, default=str)}\n\n"
+            f"[마일스톤 변경 로그]\n{json.dumps(context.milestone_update_logs, ensure_ascii=False, default=str)}\n\n"
+            f"[프로젝트 문서]\n{json.dumps(context.project_documents, ensure_ascii=False, default=str)}\n\n"
+            f"[참고 문서 목록]\n{json.dumps(citations, ensure_ascii=False, default=str)}\n"
         )
 
     def _build_citations(self, context: RiskReportContext) -> List[Dict[str, str]]:
