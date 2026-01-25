@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-import time
+import time as time_module
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -33,11 +33,11 @@ class RiskReportService:
 
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
         def log_step(label: str, start: float) -> float:
-            elapsed = time.perf_counter() - start
+            elapsed = time_module.perf_counter() - start
             logger.info("RiskReport step=%s elapsed_ms=%.2f", label, elapsed * 1000)
-            return time.perf_counter()
+            return time_module.perf_counter()
 
-        t0 = time.perf_counter()
+        t0 = time_module.perf_counter()
         start_dt = datetime.combine(week_start, time.min)
         end_dt = datetime.combine(week_end, time.max)
         t0 = log_step("range_build", t0)
