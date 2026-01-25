@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import concurrent.futures
+import logging
+import time as time_module
 from typing import Any, Optional
 
 from config import settings
@@ -7,6 +10,8 @@ from config import settings
 _local_model: Optional[Any] = None
 _openai_client: Optional[Any] = None
 _gemini_client: Optional[Any] = None
+
+logger = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -24,19 +29,45 @@ class LLMClient:
         if not settings.gemini_api_key:
             raise ValueError("RAG_GEMINI_API_KEY must be set for Gemini usage.")
         client = self._get_gemini_client()
-        response = client.models.generate_content(model=settings.gemini_model, contents=prompt)
+        timeout_s = settings.llm_timeout_seconds
+        logger.info(
+            "Gemini request start model=%s prompt_chars=%d timeout_s=%s",
+            settings.gemini_model,
+            len(prompt),
+            timeout_s,
+        )
+        started = time_module.perf_counter()
+
+        def _call() -> Any:
+            return client.models.generate_content(model=settings.gemini_model, contents=prompt)
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(_call)
+                response = future.result(timeout=timeout_s)
+        except concurrent.futures.TimeoutError as exc:
+            logger.warning("Gemini request timeout after %s seconds", timeout_s)
+            raise TimeoutError("Gemini request timed out.") from exc
+        finally:
+            elapsed = time_module.perf_counter() - started
+            logger.info("Gemini request end elapsed_ms=%.2f", elapsed * 1000)
+
         return response.text or ""
 
     def _generate_openai(self, prompt: str) -> str:
         if not settings.openai_api_key:
             raise ValueError("RAG_OPENAI_API_KEY must be set for OpenAI usage.")
         client = self._get_openai_client()
+        logger.info("OpenAI request start model=%s prompt_chars=%d", settings.openai_model, len(prompt))
+        started = time_module.perf_counter()
         response = client.chat.completions.create(
             model=settings.openai_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=settings.llm_max_tokens,
             temperature=settings.llm_temperature,
         )
+        elapsed = time_module.perf_counter() - started
+        logger.info("OpenAI request end elapsed_ms=%.2f", elapsed * 1000)
         return response.choices[0].message.content or ""
 
     def _generate_local(self, prompt: str) -> str:

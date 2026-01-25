@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 512
     llm_temperature: float = 0.2
     max_context_tokens: int = 2048
+    llm_timeout_seconds: int = 30
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str = ""
