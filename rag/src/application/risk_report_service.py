@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -31,26 +32,53 @@ class RiskReportService:
         self._llm = LLMClient()
 
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
+        def log_step(label: str, start: float) -> float:
+            elapsed = time.perf_counter() - start
+            logger.info("RiskReport step=%s elapsed_ms=%.2f", label, elapsed * 1000)
+            return time.perf_counter()
+
+        t0 = time.perf_counter()
         start_dt = datetime.combine(week_start, time.min)
         end_dt = datetime.combine(week_end, time.max)
+        t0 = log_step("range_build", t0)
         if settings.environment.lower() == "test":
             end_dt = min(end_dt, datetime.now())
             start_dt = max(start_dt, end_dt - timedelta(days=2))
+            t0 = log_step("test_window_adjust", t0)
+        project = self._repo.fetch_project(project_id)
+        t0 = log_step("fetch_project", t0)
+        weekly_reports = self._repo.fetch_weekly_reports(project_id, week_start, week_end)
+        t0 = log_step("fetch_weekly_reports", t0)
+        meeting_records = self._repo.fetch_meeting_records(project_id, start_dt, end_dt)
+        t0 = log_step("fetch_meeting_records", t0)
+        events_logs = self._repo.fetch_events_logs(project_id, start_dt, end_dt)
+        t0 = log_step("fetch_events_logs", t0)
+        task_update_logs = self._repo.fetch_task_update_logs(project_id, start_dt, end_dt)
+        t0 = log_step("fetch_task_update_logs", t0)
+        milestone_update_logs = self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt)
+        t0 = log_step("fetch_milestone_update_logs", t0)
+        project_documents = self._repo.fetch_project_documents(project_id)
+        t0 = log_step("fetch_project_documents", t0)
         context = RiskReportContext(
-            project=self._repo.fetch_project(project_id),
-            weekly_reports=self._repo.fetch_weekly_reports(project_id, week_start, week_end),
-            meeting_records=self._repo.fetch_meeting_records(project_id, start_dt, end_dt),
-            events_logs=self._repo.fetch_events_logs(project_id, start_dt, end_dt),
-            task_update_logs=self._repo.fetch_task_update_logs(project_id, start_dt, end_dt),
-            milestone_update_logs=self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt),
-            project_documents=self._repo.fetch_project_documents(project_id),
+            project=project,
+            weekly_reports=weekly_reports,
+            meeting_records=meeting_records,
+            events_logs=events_logs,
+            task_update_logs=task_update_logs,
+            milestone_update_logs=milestone_update_logs,
+            project_documents=project_documents,
         )
         if settings.environment.lower() == "test":
             context = self._apply_test_limits(context)
+            t0 = log_step("apply_test_limits", t0)
         citations = self._build_citations(context)
+        t0 = log_step("build_citations", t0)
         prompt = self._build_prompt(context, citations)
+        t0 = log_step("build_prompt", t0)
         raw = self._llm.generate(prompt)
+        t0 = log_step("llm_generate", t0)
         parsed = self._parse_json(raw)
+        t0 = log_step("parse_json", t0)
 
         likelihood = self._clamp_score(parsed.get("likelihood", 3))
         impact = self._clamp_score(parsed.get("impact", 3))
@@ -68,6 +96,7 @@ class RiskReportService:
             citations=citations,
         )
         self._repo.save_risk_analysis(result)
+        log_step("save_risk_analysis", t0)
         return result
 
     def _apply_test_limits(self, context: RiskReportContext) -> RiskReportContext:
