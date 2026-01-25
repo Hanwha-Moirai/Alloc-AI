@@ -75,6 +75,7 @@ class RiskReportService:
         citations = self._build_citations(context)
         t0 = log_step("build_citations", t0)
         prompt = self._build_prompt(context, citations)
+        logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
         raw = self._llm.generate(prompt)
         t0 = log_step("llm_generate", t0)
