@@ -36,9 +36,10 @@ sentence-transformers
 qdrant-client
 PyMuPDF
 openai
-google-generativeai
+google-genai
 MariaDB
 sqlalchemy
+python-multipart
 tiktoken
 EOF
 )
