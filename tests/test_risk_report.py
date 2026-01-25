@@ -3,9 +3,11 @@ from pathlib import Path
 
 import mariadb
 import requests
+from dotenv import load_dotenv
 
 
 def _load_seed_sql() -> None:
+    load_dotenv(Path(__file__).resolve().parents[1] / "rag" / ".env")
     host = os.getenv("RAG_MARIADB_HOST", "localhost")
     port = int(os.getenv("RAG_MARIADB_PORT", "3306"))
     user = os.getenv("RAG_MARIADB_USER")
