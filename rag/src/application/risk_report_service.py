@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from typing import Any, Dict, List
 
+from config import settings
 from domain.models import RiskAnalysisResult
 from infrastructure.llm_client import LLMClient
 from infrastructure.mariadb_repo import MariaDBRepository
