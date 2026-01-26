@@ -70,7 +70,10 @@ def generate_risk_report(
 
 
 @router.post("/upload/pdf")
-async def upload_pdf(file: UploadFile = File(...)) -> dict:
+async def upload_pdf(
+    file: UploadFile = File(...),
+    service: IngestionService = Depends(get_ingestion_service),
+) -> dict:
     # 업로드된 PDF 파일을 data 디렉터리에 저장
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename.")
@@ -84,6 +87,7 @@ async def upload_pdf(file: UploadFile = File(...)) -> dict:
     target_path = data_dir / safe_name
     content = await file.read()
     target_path.write_bytes(content)
+    service.ingest_pdf_file(target_path, data_dir)
     return {"status": "ok", "path": str(target_path)}
 
 

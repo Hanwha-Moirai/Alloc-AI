@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import json
 import logging
 import time as time_module
-from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Any, Dict
 from zoneinfo import ZoneInfo
-from typing import Any, Dict, List
 
+from application.risk_report_parser import RiskReportParser
+from application.risk_report_prompt_builder import RiskReportPromptBuilder
+from application.risk_report_retriever import RiskReportContext, RiskReportRetriever
 from config import settings
 from domain.models import RiskAnalysisResult
 from infrastructure.llm_client import LLMClient
@@ -16,71 +17,46 @@ from infrastructure.mariadb_repo import MariaDBRepository
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class RiskReportContext:
-    project: Dict[str, Any]
-    weekly_reports: List[Dict[str, Any]]
-    meeting_records: List[Dict[str, Any]]
-    events_logs: List[Dict[str, Any]]
-    task_update_logs: List[Dict[str, Any]]
-    milestone_update_logs: List[Dict[str, Any]]
-    project_documents: List[Dict[str, Any]]
-
-
 class RiskReportService:
+    # 리스크 리포트 생성 유스케이스를 오케스트레이션(수집/프롬프트/파싱/저장)하는 서비스
     def __init__(self) -> None:
-        self._repo = MariaDBRepository()
+        self._retriever = RiskReportRetriever()
+        self._prompt_builder = RiskReportPromptBuilder()
+        self._parser = RiskReportParser()
         self._llm = LLMClient()
+        self._repo = MariaDBRepository()
 
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
+        print("[RiskReport] start generate", flush=True)
+
         def log_step(label: str, start: float) -> float:
             elapsed = time_module.perf_counter() - start
             logger.info("RiskReport step=%s elapsed_ms=%.2f", label, elapsed * 1000)
             return time_module.perf_counter()
 
         t0 = time_module.perf_counter()
-        start_dt = datetime.combine(week_start, time.min)
-        end_dt = datetime.combine(week_end, time.max)
         t0 = log_step("range_build", t0)
+        print("[RiskReport] range_build done", flush=True)
+        context = self._retriever.fetch(project_id=project_id, week_start=week_start, week_end=week_end)
+        t0 = log_step("fetch_context", t0)
+        print("[RiskReport] fetch_context done", flush=True)
         if settings.environment.lower() == "test":
-            end_dt = min(end_dt, datetime.now())
-            start_dt = max(start_dt, end_dt - timedelta(days=2))
-            t0 = log_step("test_window_adjust", t0)
-        project = self._repo.fetch_project(project_id)
-        t0 = log_step("fetch_project", t0)
-        weekly_reports = self._repo.fetch_weekly_reports(project_id, week_start, week_end)
-        t0 = log_step("fetch_weekly_reports", t0)
-        meeting_records = self._repo.fetch_meeting_records(project_id, start_dt, end_dt)
-        t0 = log_step("fetch_meeting_records", t0)
-        events_logs = self._repo.fetch_events_logs(project_id, start_dt, end_dt)
-        t0 = log_step("fetch_events_logs", t0)
-        task_update_logs = self._repo.fetch_task_update_logs(project_id, start_dt, end_dt)
-        t0 = log_step("fetch_task_update_logs", t0)
-        milestone_update_logs = self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt)
-        t0 = log_step("fetch_milestone_update_logs", t0)
-        project_documents = self._repo.fetch_project_documents(project_id)
-        t0 = log_step("fetch_project_documents", t0)
-        context = RiskReportContext(
-            project=project,
-            weekly_reports=weekly_reports,
-            meeting_records=meeting_records,
-            events_logs=events_logs,
-            task_update_logs=task_update_logs,
-            milestone_update_logs=milestone_update_logs,
-            project_documents=project_documents,
-        )
-        if settings.environment.lower() == "test":
-            context = self._apply_test_limits(context)
+            context = self._apply_test_limits(context, week_start=week_start, week_end=week_end)
             t0 = log_step("apply_test_limits", t0)
-        citations = self._build_citations(context)
+            print("[RiskReport] apply_test_limits done", flush=True)
+        citations = self._prompt_builder.build_citations(context)
         t0 = log_step("build_citations", t0)
-        prompt = self._build_prompt(context, citations)
+        print("[RiskReport] build_citations done", flush=True)
+        prompt = self._prompt_builder.build_prompt(context, citations)
         logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
+        print("[RiskReport] build_prompt done", flush=True)
         raw = self._llm.generate(prompt)
         t0 = log_step("llm_generate", t0)
-        parsed = self._parse_json(raw)
+        print("[RiskReport] llm_generate done", flush=True)
+        parsed = self._parser.parse(raw)
         t0 = log_step("parse_json", t0)
+        print("[RiskReport] parse_json done", flush=True)
 
         likelihood = self._clamp_score(parsed.get("likelihood", 3))
         impact = self._clamp_score(parsed.get("impact", 3))
@@ -99,15 +75,34 @@ class RiskReportService:
         )
         self._repo.save_risk_analysis(result)
         log_step("save_risk_analysis", t0)
+        print("[RiskReport] save_risk_analysis done", flush=True)
         return result
 
-    def _apply_test_limits(self, context: RiskReportContext) -> RiskReportContext:
+    def _apply_test_limits(
+        self, context: RiskReportContext, *, week_start: date, week_end: date
+    ) -> RiskReportContext:
         max_docs = 5
         max_chars = 800
+        start_dt = datetime.combine(week_start, time.min)
+        end_dt = datetime.combine(week_end, time.max)
+        end_dt = min(end_dt, datetime.now())
+        start_dt = max(start_dt, end_dt - timedelta(days=2))
+
+        weekly_reports = [
+            self._trim_weekly_report(item, max_chars)
+            for item in context.weekly_reports
+            if self._within_date(item.get("week_start_date"), start_dt.date(), end_dt.date())
+        ][:max_docs]
+        meeting_records = [
+            self._trim_meeting_record(item, max_chars)
+            for item in context.meeting_records
+            if self._within_datetime(item.get("meeting_date"), start_dt, end_dt)
+        ][:max_docs]
+
         return RiskReportContext(
             project=context.project,
-            weekly_reports=[self._trim_weekly_report(item, max_chars) for item in context.weekly_reports[:max_docs]],
-            meeting_records=[self._trim_meeting_record(item, max_chars) for item in context.meeting_records[:max_docs]],
+            weekly_reports=weekly_reports,
+            meeting_records=meeting_records,
             events_logs=[self._trim_text_field(item, "log_description", max_chars) for item in context.events_logs[:max_docs]],
             task_update_logs=[self._trim_text_field(item, "update_reason", max_chars) for item in context.task_update_logs[:max_docs]],
             milestone_update_logs=[
@@ -117,7 +112,18 @@ class RiskReportService:
             project_documents=[
                 self._trim_text_field(item, "extracted_text", max_chars) for item in context.project_documents[:max_docs]
             ],
+            vector_evidence=[self._trim_text_field(item, "text", max_chars) for item in context.vector_evidence[:max_docs]],
         )
+
+    def _within_date(self, value: Any, start: date, end: date) -> bool:
+        if not isinstance(value, date):
+            return True
+        return start <= value <= end
+
+    def _within_datetime(self, value: Any, start: datetime, end: datetime) -> bool:
+        if not isinstance(value, datetime):
+            return True
+        return start <= value <= end
 
     def _trim_weekly_report(self, item: Dict[str, Any], max_chars: int) -> Dict[str, Any]:
         trimmed = dict(item)
@@ -140,66 +146,6 @@ class RiskReportService:
         if len(text) > max_chars:
             return text[:max_chars] + "..."
         return text
-
-    def _build_prompt(self, context: RiskReportContext, citations: List[Dict[str, str]]) -> str:
-        return (
-            "너는 IT 프로젝트 리스크 관리 전문가다. 아래 문서들을 근거로 "
-            "일정 지연 리스크를 PI 매트릭스(발생 가능성/영향도 1~5)로 평가하라.\n"
-            "사내 리스크 데이터가 충분하지 않아 몬테카를로 대신 정성적 PI 매트릭스를 사용한다.\n"
-            "문서 기반 정성 분석은 LLM이 잘하기 때문에 RAG로 근거를 요약한다.\n\n"
-            "응답은 JSON만 출력하고, 다음 키를 포함하라:\n"
-            '{"likelihood": 1, "impact": 1, "summary": "...", "rationale": "..."}\n\n'
-            f"[프로젝트 메타]\n{json.dumps(context.project, ensure_ascii=False, default=str)}\n\n"
-            f"[주간 보고]\n{json.dumps(context.weekly_reports, ensure_ascii=False, default=str)}\n\n"
-            f"[회의록]\n{json.dumps(context.meeting_records, ensure_ascii=False, default=str)}\n\n"
-            f"[일정 변경 로그]\n{json.dumps(context.events_logs, ensure_ascii=False, default=str)}\n\n"
-            f"[태스크 변경 로그]\n{json.dumps(context.task_update_logs, ensure_ascii=False, default=str)}\n\n"
-            f"[마일스톤 변경 로그]\n{json.dumps(context.milestone_update_logs, ensure_ascii=False, default=str)}\n\n"
-            f"[프로젝트 문서]\n{json.dumps(context.project_documents, ensure_ascii=False, default=str)}\n\n"
-            f"[참고 문서 목록]\n{json.dumps(citations, ensure_ascii=False, default=str)}\n"
-        )
-
-    def _build_citations(self, context: RiskReportContext) -> List[Dict[str, str]]:
-        citations: List[Dict[str, str]] = []
-        for item in context.weekly_reports:
-            citations.append(self._citation("weekly_report", item.get("report_id"), item.get("summary_text")))
-        for item in context.meeting_records:
-            citations.append(self._citation("meeting_record", item.get("meeting_id"), item.get("agenda_summary")))
-        for item in context.events_logs:
-            citations.append(self._citation("events_log", item.get("event_log_id"), item.get("log_description")))
-        for item in context.task_update_logs:
-            citations.append(self._citation("task_update_log", item.get("task_update_log_id"), item.get("update_reason")))
-        for item in context.milestone_update_logs:
-            citations.append(
-                self._citation("milestone_update_log", item.get("milestone_update_log_id"), item.get("update_reason"))
-            )
-        for item in context.project_documents:
-            citations.append(self._citation("project_document", item.get("doc_id"), item.get("extracted_text")))
-        return [item for item in citations if item["excerpt"]]
-
-    def _citation(self, source_type: str, source_id: Any, text: Any) -> Dict[str, str]:
-        excerpt = str(text or "").strip().replace("\n", " ")
-        if len(excerpt) > 240:
-            excerpt = excerpt[:240] + "..."
-        return {
-            "source_type": source_type,
-            "source_id": str(source_id) if source_id is not None else "",
-            "excerpt": excerpt,
-        }
-
-    def _parse_json(self, raw: str) -> Dict[str, Any]:
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            pass
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            try:
-                return json.loads(raw[start : end + 1])
-            except json.JSONDecodeError:
-                logger.warning("Failed to parse JSON from LLM output.")
-        return {}
 
     def _clamp_score(self, value: Any) -> int:
         try:
