@@ -27,6 +27,8 @@ class RiskReportService:
         self._repo = MariaDBRepository()
 
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
+        print("[RiskReport] start generate", flush=True)
+
         def log_step(label: str, start: float) -> float:
             elapsed = time_module.perf_counter() - start
             logger.info("RiskReport step=%s elapsed_ms=%.2f", label, elapsed * 1000)
@@ -34,20 +36,27 @@ class RiskReportService:
 
         t0 = time_module.perf_counter()
         t0 = log_step("range_build", t0)
+        print("[RiskReport] range_build done", flush=True)
         context = self._retriever.fetch(project_id=project_id, week_start=week_start, week_end=week_end)
         t0 = log_step("fetch_context", t0)
+        print("[RiskReport] fetch_context done", flush=True)
         if settings.environment.lower() == "test":
             context = self._apply_test_limits(context, week_start=week_start, week_end=week_end)
             t0 = log_step("apply_test_limits", t0)
+            print("[RiskReport] apply_test_limits done", flush=True)
         citations = self._prompt_builder.build_citations(context)
         t0 = log_step("build_citations", t0)
+        print("[RiskReport] build_citations done", flush=True)
         prompt = self._prompt_builder.build_prompt(context, citations)
         logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
+        print("[RiskReport] build_prompt done", flush=True)
         raw = self._llm.generate(prompt)
         t0 = log_step("llm_generate", t0)
+        print("[RiskReport] llm_generate done", flush=True)
         parsed = self._parser.parse(raw)
         t0 = log_step("parse_json", t0)
+        print("[RiskReport] parse_json done", flush=True)
 
         likelihood = self._clamp_score(parsed.get("likelihood", 3))
         impact = self._clamp_score(parsed.get("impact", 3))
@@ -66,6 +75,7 @@ class RiskReportService:
         )
         self._repo.save_risk_analysis(result)
         log_step("save_risk_analysis", t0)
+        print("[RiskReport] save_risk_analysis done", flush=True)
         return result
 
     def _apply_test_limits(
