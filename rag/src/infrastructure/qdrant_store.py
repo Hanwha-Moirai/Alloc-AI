@@ -28,7 +28,7 @@ class QdrantAdapter:
         query_vector = embed_text([query])[0]
         response = self.client.query_points(
             collection_name=self.collection,
-            query_vector=query_vector,
+            query=query_vector,
             limit=k,
             with_payload=True,
         )
