@@ -26,12 +26,13 @@ class QdrantAdapter:
         # 4단계: 검색(쿼리 -> 벡터 검색)
         print(f"[Qdrant] search query_chars={len(query)} top_k={k}", flush=True)
         query_vector = embed_text([query])[0]
-        results = self.client.search(
+        response = self.client.query_points(
             collection_name=self.collection,
             query_vector=query_vector,
             limit=k,
             with_payload=True,
         )
+        results = response.points
         logger.info("Qdrant search results=%d collection=%s", len(results), self.collection)
         return [self._to_search_result(point) for point in results]
 
