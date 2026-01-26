@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from infrastructure.ingestion.chunk import chunk_text
-from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir
+from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir, load_pdf
 from infrastructure.ingestion.embed import embed_text
 from infrastructure.ingestion.index import index_embeddings
 
@@ -34,3 +34,10 @@ class IngestionService:
         if not payloads:
             logger.warning("No PDF files found under data dir: %s", resolved_dir)
         return payloads
+
+    def ingest_pdf_file(self, file_path: Path, base_dir: Path) -> None:
+        payload = load_pdf(file_path, base_dir)
+        if not payload.text:
+            logger.warning("Empty PDF text extracted: %s", file_path)
+            return
+        self.ingest(payload.doc_id, payload.text, payload.metadata)
