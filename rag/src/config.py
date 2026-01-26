@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     top_k: int = 5
     rerank_k: int = 10
 
+    # Embeddings
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_normalize: bool = True
+
     # LLM
     llm_provider: str = "stub"
     llm_model_path: str = ""
