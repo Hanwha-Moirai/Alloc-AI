@@ -34,6 +34,7 @@ def iter_pdfs_from_dir(data_dir: str) -> Iterable[DocumentPayload]:
 
 
 def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
+    print(f"[Loader] open pdf={path}", flush=True)
     doc = fitz.open(path)
     texts = []
     for page in doc:

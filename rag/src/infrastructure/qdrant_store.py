@@ -23,6 +23,7 @@ class QdrantAdapter:
             logger.warning("Qdrant collection missing: %s", self.collection)
             return []
         # 4단계: 검색(쿼리 -> 벡터 검색)
+        print(f"[Qdrant] search query_chars={len(query)} top_k={k}", flush=True)
         query_vector = embed_text([query])[0]
         results = self.client.search(
             collection_name=self.collection,
@@ -40,6 +41,7 @@ class QdrantAdapter:
             raise ValueError("Chunks and vectors must be the same length.")
         self._ensure_collection(len(vectors[0]))
         # 3단계: 임베딩을 벡터 DB에 저장
+        print(f"[Qdrant] upsert doc_id={doc_id} chunks={len(chunks)}", flush=True)
         points = []
         for idx, (chunk, vector) in enumerate(zip(chunks, vectors)):
             payload = {

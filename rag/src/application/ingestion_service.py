@@ -36,8 +36,12 @@ class IngestionService:
         return payloads
 
     def ingest_pdf_file(self, file_path: Path, base_dir: Path) -> None:
+        print(f"[Ingestion] start file={file_path}", flush=True)
         payload = load_pdf(file_path, base_dir)
         if not payload.text:
+            print(f"[Ingestion] empty text file={file_path}", flush=True)
             logger.warning("Empty PDF text extracted: %s", file_path)
             return
+        print(f"[Ingestion] extracted chars={len(payload.text)} file={file_path}", flush=True)
         self.ingest(payload.doc_id, payload.text, payload.metadata)
+        print(f"[Ingestion] upsert done doc_id={payload.doc_id}", flush=True)

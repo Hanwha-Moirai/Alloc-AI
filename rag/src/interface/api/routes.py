@@ -87,6 +87,7 @@ async def upload_pdf(
     target_path = data_dir / safe_name
     content = await file.read()
     target_path.write_bytes(content)
+    print(f"[Upload] saved path={target_path}", flush=True)
     service.ingest_pdf_file(target_path, data_dir)
     return {"status": "ok", "path": str(target_path)}
 

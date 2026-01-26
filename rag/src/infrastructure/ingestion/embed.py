@@ -25,5 +25,8 @@ def embed_text(texts: List[str]) -> List[List[float]]:
     # 3단계: 임베딩(BGE)
     if not texts:
         return []
+    print(f"[Embedding] start batch={len(texts)} chars={sum(len(t) for t in texts)}", flush=True)
     embedder = _get_embedder()
-    return embedder.embed_documents(texts)
+    vectors = embedder.embed_documents(texts)
+    print(f"[Embedding] done vectors={len(vectors)} dim={len(vectors[0]) if vectors else 0}", flush=True)
+    return vectors
