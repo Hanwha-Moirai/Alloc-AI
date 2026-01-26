@@ -20,6 +20,7 @@ class QdrantAdapter:
 
     def search(self, query: str, k: int) -> List[SearchResult]:
         if not self._collection_exists():
+            logger.warning("Qdrant collection missing: %s", self.collection)
             return []
         # 4단계: 검색(쿼리 -> 벡터 검색)
         query_vector = embed_text([query])[0]
@@ -29,6 +30,7 @@ class QdrantAdapter:
             limit=k,
             with_payload=True,
         )
+        logger.info("Qdrant search results=%d collection=%s", len(results), self.collection)
         return [self._to_search_result(point) for point in results]
 
     def upsert(self, doc_id: str, chunks: List[str], vectors: List[List[float]], metadata: dict) -> None:

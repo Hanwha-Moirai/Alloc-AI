@@ -55,6 +55,7 @@ class RiskReportRetriever:
 
     def _fetch_vector_evidence(self, project_id: str, week_start: date, week_end: date) -> List[Dict[str, Any]]:
         query = f"프로젝트 {project_id} 일정 지연 리스크 분석 ({week_start}~{week_end})"
+        logger.info("RiskReport vector_query=%s top_k=%d", query, settings.top_k)
         results = self._vector.search(query, k=settings.top_k)
         return [self._to_evidence(item) for item in results]
 
