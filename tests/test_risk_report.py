@@ -27,6 +27,15 @@ def _load_seed_sql() -> None:
 
 _load_seed_sql()
 
+upload_path = Path(__file__).with_name("sample.pdf")
+if upload_path.exists():
+    with upload_path.open("rb") as fp:
+        files = {"file": (upload_path.name, fp, "application/pdf")}
+        upload_res = requests.post("http://localhost:8000/upload/pdf", files=files)
+        print("[TEST] Upload status:", upload_res.status_code)
+        if upload_res.status_code != 200:
+            print(upload_res.text)
+
 payload = {
     "week_start": "2024-01-01",
     "week_end": "2024-01-07",
