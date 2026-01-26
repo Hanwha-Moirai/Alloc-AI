@@ -27,7 +27,7 @@ def _load_seed_sql() -> None:
 
 _load_seed_sql()
 
-upload_path = Path(__file__).with_name("samples") / "iso_21500.pdf"
+upload_path = Path(__file__).with_name("samples") / "software_development_process_guide.pdf"
 if upload_path.exists():
     with upload_path.open("rb") as fp:
         files = {"file": (upload_path.name, fp, "application/pdf")}
