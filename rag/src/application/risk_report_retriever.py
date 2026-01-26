@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any, Dict, List
 
+import logging
+
 from config import settings
 from domain.models import SearchResult
 from infrastructure.mariadb_repo import MariaDBRepository
@@ -39,6 +41,7 @@ class RiskReportRetriever:
         milestone_update_logs = self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt)
         project_documents = self._repo.fetch_project_documents(project_id)
         vector_hits = self._fetch_vector_evidence(project_id, week_start, week_end)
+        logger.info("RiskReport vector_evidence_count=%d", len(vector_hits))
         return RiskReportContext(
             project=project,
             weekly_reports=weekly_reports,
@@ -62,3 +65,4 @@ class RiskReportRetriever:
             "text": item.text,
             "metadata": item.metadata,
         }
+logger = logging.getLogger(__name__)
