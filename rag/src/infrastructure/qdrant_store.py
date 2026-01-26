@@ -1,4 +1,5 @@
 from typing import List
+import uuid
 import logging
 
 from config import settings
@@ -50,7 +51,7 @@ class QdrantAdapter:
                 "text": chunk,
                 "metadata": metadata,
             }
-            point_id = f"{doc_id}:{idx}"
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_id}:{idx}"))
             points.append(rest.PointStruct(id=point_id, vector=vector, payload=payload))
         self.client.upsert(collection_name=self.collection, points=points)
 
