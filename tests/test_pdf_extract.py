@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+RAG_SRC = PROJECT_ROOT / "rag" / "src"
+sys.path.insert(0, str(RAG_SRC))
 
 from infrastructure.ingestion.docs_loader import load_pdf
 
