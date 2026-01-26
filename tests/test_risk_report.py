@@ -36,6 +36,7 @@ if upload_path.exists():
         print("[TEST] Upload status:", upload_res.status_code)
         if upload_res.status_code != 200:
             print(upload_res.text)
+            raise RuntimeError(f"Upload failed with status {upload_res.status_code}")
 else:
     print("[TEST] Upload skipped: sample PDF not found:", upload_path)
 
