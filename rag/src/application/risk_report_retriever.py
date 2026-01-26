@@ -31,16 +31,26 @@ class RiskReportRetriever:
         self._vector = QdrantAdapter()
 
     def fetch(self, *, project_id: str, week_start: date, week_end: date) -> RiskReportContext:
+        print("[RiskReport] retriever start", flush=True)
         start_dt = datetime.combine(week_start, time.min)
         end_dt = datetime.combine(week_end, time.max)
+        print("[RiskReport] retriever range ready", flush=True)
         project = self._repo.fetch_project(project_id)
+        print("[RiskReport] retriever fetch_project done", flush=True)
         weekly_reports = self._repo.fetch_weekly_reports(project_id, week_start, week_end)
+        print("[RiskReport] retriever fetch_weekly_reports done", flush=True)
         meeting_records = self._repo.fetch_meeting_records(project_id, start_dt, end_dt)
+        print("[RiskReport] retriever fetch_meeting_records done", flush=True)
         events_logs = self._repo.fetch_events_logs(project_id, start_dt, end_dt)
+        print("[RiskReport] retriever fetch_events_logs done", flush=True)
         task_update_logs = self._repo.fetch_task_update_logs(project_id, start_dt, end_dt)
+        print("[RiskReport] retriever fetch_task_update_logs done", flush=True)
         milestone_update_logs = self._repo.fetch_milestone_update_logs(project_id, start_dt, end_dt)
+        print("[RiskReport] retriever fetch_milestone_update_logs done", flush=True)
         project_documents = self._repo.fetch_project_documents(project_id)
+        print("[RiskReport] retriever fetch_project_documents done", flush=True)
         vector_hits = self._fetch_vector_evidence(project_id, week_start, week_end)
+        print(f"[RiskReport] retriever vector_hits={len(vector_hits)}", flush=True)
         logger.info("RiskReport vector_evidence_count=%d", len(vector_hits))
         return RiskReportContext(
             project=project,
@@ -55,8 +65,10 @@ class RiskReportRetriever:
 
     def _fetch_vector_evidence(self, project_id: str, week_start: date, week_end: date) -> List[Dict[str, Any]]:
         query = f"프로젝트 {project_id} 일정 지연 리스크 분석 ({week_start}~{week_end})"
+        print(f"[RiskReport] retriever vector_query={query}", flush=True)
         logger.info("RiskReport vector_query=%s top_k=%d", query, settings.top_k)
         results = self._vector.search(query, k=settings.top_k)
+        print(f"[RiskReport] retriever vector_search_results={len(results)}", flush=True)
         return [self._to_evidence(item) for item in results]
 
     def _to_evidence(self, item: SearchResult) -> Dict[str, Any]:
