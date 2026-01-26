@@ -39,12 +39,13 @@ def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
     texts = []
     for page in doc:
         texts.append(page.get_text("text"))
+    page_count = doc.page_count
     doc.close()
     text = "\n".join(texts).strip()
     rel_path = path.resolve().relative_to(base_dir).as_posix()
     metadata = {
         "source_path": rel_path,
         "file_name": path.name,
-        "page_count": doc.page_count,
+        "page_count": page_count,
     }
     return DocumentPayload(doc_id=rel_path, text=text, metadata=metadata)
