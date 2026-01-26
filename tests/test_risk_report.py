@@ -27,7 +27,7 @@ def _load_seed_sql() -> None:
 
 _load_seed_sql()
 
-upload_path = Path(__file__).with_name("sample.pdf")
+upload_path = Path(__file__).with_name("samples") / "iso_21500.pdf"
 if upload_path.exists():
     with upload_path.open("rb") as fp:
         files = {"file": (upload_path.name, fp, "application/pdf")}
@@ -35,6 +35,8 @@ if upload_path.exists():
         print("[TEST] Upload status:", upload_res.status_code)
         if upload_res.status_code != 200:
             print(upload_res.text)
+else:
+    print("[TEST] Upload skipped: sample PDF not found:", upload_path)
 
 payload = {
     "week_start": "2024-01-01",
