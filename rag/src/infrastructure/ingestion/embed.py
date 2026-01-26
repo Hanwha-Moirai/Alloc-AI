@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from langchain.embeddings import HuggingFaceBgeEmbeddings
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 
 from config import settings
 
