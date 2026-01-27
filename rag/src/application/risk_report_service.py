@@ -78,13 +78,16 @@ class RiskReportService:
         print("[RiskReport] save_risk_analysis done", flush=True)
         return result
 
-    def list(self, *, project_id: str, page: int, size: int) -> tuple[list[RiskAnalysisResult], int]:
+    def list(self, *, project_id: str, page: int, size: int) -> tuple[list[dict[str, Any]], int]:
         page = max(1, int(page))
         size = max(1, int(size))
         offset = (page - 1) * size
-        results = self._repo.fetch_risk_analyses(project_id=project_id, limit=size, offset=offset)
+        results = self._repo.fetch_risk_analysis_summaries(project_id=project_id, limit=size, offset=offset)
         total = self._repo.count_risk_analyses(project_id=project_id)
         return results, total
+
+    def get_detail(self, *, project_id: str, report_id: int) -> dict[str, Any] | None:
+        return self._repo.fetch_risk_analysis_detail(project_id=project_id, report_id=report_id)
 
     def _apply_test_limits(
         self, context: RiskReportContext, *, week_start: date, week_end: date

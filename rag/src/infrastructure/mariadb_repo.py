@@ -146,34 +146,59 @@ class MariaDBRepository:
         except Exception as exc:
             logger.warning("Failed to save risk analysis result: %s", exc)
 
-    def fetch_risk_analyses(self, project_id: str, limit: int, offset: int) -> List[RiskAnalysisResult]:
+    def fetch_risk_analysis_summaries(self, project_id: str, limit: int, offset: int) -> List[Dict[str, Any]]:
         sql = (
-            "SELECT project_id, likelihood, impact, summary_text, rationale_text, citations_json, created_at "
-            "FROM risk_analysis "
-            "WHERE project_id = :project_id "
-            "ORDER BY created_at DESC "
+            "SELECT ra.risk_analysis_id, ra.project_id, p.name AS project_name, "
+            "ra.summary_text, ra.likelihood, ra.impact, ra.created_at "
+            "FROM risk_analysis ra "
+            "JOIN project p ON p.project_id = ra.project_id "
+            "WHERE ra.project_id = :project_id "
+            "ORDER BY ra.created_at DESC "
             "LIMIT :limit OFFSET :offset"
         )
         rows = self._query(sql, {"project_id": project_id, "limit": limit, "offset": offset})
-        results: List[RiskAnalysisResult] = []
-        for row in rows:
-            citations_raw = row.get("citations_json") or "[]"
-            try:
-                citations = json.loads(citations_raw)
-            except (TypeError, json.JSONDecodeError):
-                citations = []
-            results.append(
-                RiskAnalysisResult(
-                    project_id=str(row.get("project_id")),
-                    likelihood=int(row.get("likelihood") or 0),
-                    impact=int(row.get("impact") or 0),
-                    summary=str(row.get("summary_text") or ""),
-                    rationale=str(row.get("rationale_text") or ""),
-                    generated_at=row.get("created_at"),
-                    citations=citations,
-                )
-            )
-        return results
+        return [
+            {
+                "report_id": row.get("risk_analysis_id"),
+                "project_id": str(row.get("project_id")),
+                "project_name": str(row.get("project_name") or ""),
+                "summary": str(row.get("summary_text") or ""),
+                "likelihood": int(row.get("likelihood") or 0),
+                "impact": int(row.get("impact") or 0),
+                "generated_at": row.get("created_at"),
+            }
+            for row in rows
+        ]
+
+    def fetch_risk_analysis_detail(self, project_id: str, report_id: int) -> Dict[str, Any] | None:
+        sql = (
+            "SELECT ra.risk_analysis_id, ra.project_id, p.name AS project_name, "
+            "ra.summary_text, ra.rationale_text, ra.likelihood, ra.impact, "
+            "ra.citations_json, ra.created_at "
+            "FROM risk_analysis ra "
+            "JOIN project p ON p.project_id = ra.project_id "
+            "WHERE ra.project_id = :project_id AND ra.risk_analysis_id = :report_id"
+        )
+        rows = self._query(sql, {"project_id": project_id, "report_id": report_id})
+        if not rows:
+            return None
+        row = rows[0]
+        citations_raw = row.get("citations_json") or "[]"
+        try:
+            citations = json.loads(citations_raw)
+        except (TypeError, json.JSONDecodeError):
+            citations = []
+        return {
+            "report_id": row.get("risk_analysis_id"),
+            "project_id": str(row.get("project_id")),
+            "project_name": str(row.get("project_name") or ""),
+            "summary": str(row.get("summary_text") or ""),
+            "rationale": str(row.get("rationale_text") or ""),
+            "likelihood": int(row.get("likelihood") or 0),
+            "impact": int(row.get("impact") or 0),
+            "generated_at": row.get("created_at"),
+            "citations": citations,
+        }
 
     def count_risk_analyses(self, project_id: str) -> int:
         sql = "SELECT COUNT(*) AS total FROM risk_analysis WHERE project_id = :project_id"
