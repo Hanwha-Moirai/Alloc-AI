@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import FastAPI
+from fastapi_pagination import add_pagination
 
 from config import settings
 from interface.api.routes import router as api_router
@@ -11,6 +12,7 @@ def create_app() -> FastAPI:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     app = FastAPI(title=settings.app_name)
     app.include_router(api_router)
+    add_pagination(app)
     return app
 
 

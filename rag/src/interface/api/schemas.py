@@ -31,22 +31,6 @@ class SearchResponse(BaseModel):
     results: List[SearchResult]
 
 
-class AnswerRequest(BaseModel):
-    query: str = Field(..., min_length=1)
-    top_k: Optional[int] = None
-
-
-class AnswerResponse(BaseModel):
-    answer: str
-    citations: List[SearchResult]
-
-
-class IngestRequest(BaseModel):
-    doc_id: str
-    text: str
-    metadata: dict = Field(default_factory=dict)
-
-
 class RiskReportRequest(BaseModel):
     week_start: date
     week_end: date

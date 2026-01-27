@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.params import File
+from fastapi_pagination import Page, Params, create_page
 
 from application.ingestion_service import IngestionService
 from application.rag_service import RagService
@@ -26,29 +27,6 @@ def search(
     return schemas.SearchResponse(results=[schemas.SearchResult.from_domain(item) for item in results])
 
 
-@router.post("/answer", response_model=schemas.AnswerResponse)
-def answer(
-    payload: schemas.AnswerRequest,
-    service: RagService = Depends(get_rag_service),
-) -> schemas.AnswerResponse:
-    # 검색 결과를 근거로 LLM 답변 생성
-    response, results = service.answer(payload.query, top_k=payload.top_k)
-    return schemas.AnswerResponse(
-        answer=response,
-        citations=[schemas.SearchResult.from_domain(item) for item in results],
-    )
-
-
-@router.post("/ingest")
-def ingest(
-    payload: schemas.IngestRequest,
-    service: IngestionService = Depends(get_ingestion_service),
-) -> dict:
-    # 텍스트 입력을 청크/임베딩 후 벡터 DB에 적재
-    service.ingest(payload.doc_id, payload.text, payload.metadata)
-    return {"status": "ok"}
-
-
 @router.post("/api/projects/{project_id}/docs/risk_report", response_model=schemas.RiskReportResponse)
 def generate_risk_report(
     project_id: str,
@@ -67,6 +45,31 @@ def generate_risk_report(
         generated_at=result.generated_at,
         citations=[schemas.RiskCitation(**item) for item in result.citations],
     )
+
+
+@router.get(
+    "/api/projects/{project_id}/docs/risk_reports",
+    response_model=Page[schemas.RiskReportResponse],
+)
+def list_risk_reports(
+    project_id: str,
+    params: Params = Depends(),
+    service: RiskReportService = Depends(get_risk_report_service),
+) -> Page[schemas.RiskReportResponse]:
+    results, total = service.list(project_id=project_id, page=params.page, size=params.size)
+    items = [
+        schemas.RiskReportResponse(
+            project_id=item.project_id,
+            likelihood=item.likelihood,
+            impact=item.impact,
+            summary=item.summary,
+            rationale=item.rationale,
+            generated_at=item.generated_at,
+            citations=[schemas.RiskCitation(**citation) for citation in item.citations],
+        )
+        for item in results
+    ]
+    return create_page(items, total, params)
 
 
 @router.post("/upload/pdf")

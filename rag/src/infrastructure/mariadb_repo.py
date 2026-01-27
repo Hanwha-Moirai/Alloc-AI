@@ -146,6 +146,45 @@ class MariaDBRepository:
         except Exception as exc:
             logger.warning("Failed to save risk analysis result: %s", exc)
 
+    def fetch_risk_analyses(self, project_id: str, limit: int, offset: int) -> List[RiskAnalysisResult]:
+        sql = (
+            "SELECT project_id, likelihood, impact, summary_text, rationale_text, citations_json, created_at "
+            "FROM risk_analysis "
+            "WHERE project_id = :project_id "
+            "ORDER BY created_at DESC "
+            "LIMIT :limit OFFSET :offset"
+        )
+        rows = self._query(sql, {"project_id": project_id, "limit": limit, "offset": offset})
+        results: List[RiskAnalysisResult] = []
+        for row in rows:
+            citations_raw = row.get("citations_json") or "[]"
+            try:
+                citations = json.loads(citations_raw)
+            except (TypeError, json.JSONDecodeError):
+                citations = []
+            results.append(
+                RiskAnalysisResult(
+                    project_id=str(row.get("project_id")),
+                    likelihood=int(row.get("likelihood") or 0),
+                    impact=int(row.get("impact") or 0),
+                    summary=str(row.get("summary_text") or ""),
+                    rationale=str(row.get("rationale_text") or ""),
+                    generated_at=row.get("created_at"),
+                    citations=citations,
+                )
+            )
+        return results
+
+    def count_risk_analyses(self, project_id: str) -> int:
+        sql = "SELECT COUNT(*) AS total FROM risk_analysis WHERE project_id = :project_id"
+        rows = self._query(sql, {"project_id": project_id})
+        if not rows:
+            return 0
+        try:
+            return int(rows[0].get("total") or 0)
+        except (TypeError, ValueError):
+            return 0
+
     def _build_dsn(self) -> str:
         password = quote_plus(settings.mariadb_password)
         return (
