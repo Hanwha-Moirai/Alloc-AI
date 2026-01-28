@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List
 
-import fitz
+from pdf import extract_pdf_text
 
 
 @dataclass(frozen=True)
@@ -35,13 +35,7 @@ def iter_pdfs_from_dir(data_dir: str) -> Iterable[DocumentPayload]:
 
 def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
     print(f"[Loader] open pdf={path}", flush=True)
-    doc = fitz.open(path)
-    texts = []
-    for page in doc:
-        texts.append(page.get_text("text"))
-    page_count = doc.page_count
-    doc.close()
-    text = "\n".join(texts).strip()
+    text, page_count = extract_pdf_text(path)
     rel_path = path.resolve().relative_to(base_dir).as_posix()
     metadata = {
         "source_path": rel_path,

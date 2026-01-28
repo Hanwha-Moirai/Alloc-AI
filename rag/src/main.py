@@ -1,10 +1,16 @@
 import logging
+import sys
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi_pagination import add_pagination
 
 from config import settings
 from interface.api.routes import router as api_router
+
+_repo_root = Path(__file__).resolve().parents[2]
+if str(_repo_root) not in sys.path:
+    sys.path.append(str(_repo_root))
 
 
 def create_app() -> FastAPI:
