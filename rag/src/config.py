@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     embedding_model: str = "BAAI/bge-m3"
     embedding_normalize: bool = True
 
+    # PDF service
+    pdf_service_url: str = "http://localhost:8010"
+
     # LLM
     llm_provider: str = "stub"
     llm_model_path: str = ""
