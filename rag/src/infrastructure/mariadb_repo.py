@@ -151,7 +151,7 @@ class MariaDBRepository:
             "SELECT ra.risk_analysis_id, ra.project_id, p.name AS project_name, "
             "ra.summary_text, ra.likelihood, ra.impact, ra.created_at "
             "FROM risk_analysis ra "
-            "JOIN project p ON p.project_id = ra.project_id "
+            "LEFT JOIN project p ON p.project_id = ra.project_id "
             "WHERE ra.project_id = :project_id "
             "ORDER BY ra.created_at DESC "
             "LIMIT :limit OFFSET :offset"
@@ -176,7 +176,7 @@ class MariaDBRepository:
             "ra.summary_text, ra.rationale_text, ra.likelihood, ra.impact, "
             "ra.citations_json, ra.created_at "
             "FROM risk_analysis ra "
-            "JOIN project p ON p.project_id = ra.project_id "
+            "LEFT JOIN project p ON p.project_id = ra.project_id "
             "WHERE ra.project_id = :project_id AND ra.risk_analysis_id = :report_id"
         )
         rows = self._query(sql, {"project_id": project_id, "report_id": report_id})
