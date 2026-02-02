@@ -40,6 +40,7 @@ google-genai
 MariaDB
 sqlalchemy
 python-multipart
+fastapi-pagination
 tiktoken
 EOF
 )

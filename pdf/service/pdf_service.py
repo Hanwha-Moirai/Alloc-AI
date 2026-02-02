@@ -10,22 +10,20 @@ from pdf.config import settings
 def extract_pdf_text(path: Path) -> Tuple[str, int]:
     doc = fitz.open(path)
     try:
-        texts = [page.get_text("text") for page in doc]
+        text = _extract_text(doc)
         page_count = doc.page_count
     finally:
         doc.close()
-    text = "\n".join(texts).strip()
     return text, page_count
 
 
 def extract_pdf_text_from_bytes(content: bytes) -> Tuple[str, int]:
     doc = fitz.open(stream=content, filetype="pdf")
     try:
-        texts = [page.get_text("text") for page in doc]
+        text = _extract_text(doc)
         page_count = doc.page_count
     finally:
         doc.close()
-    text = "\n".join(texts).strip()
     return text, page_count
 
 
@@ -46,3 +44,20 @@ def upload_pdf_to_s3(file_name: str, content: bytes) -> str:
     key = f"{settings.s3_prefix}{uuid.uuid4().hex}{suffix}"
     s3.put_object(Bucket=settings.s3_bucket, Key=key, Body=content, ContentType="application/pdf")
     return key
+
+
+def _extract_text(doc: fitz.Document) -> str:
+    try:
+        import pymupdf4llm
+    except Exception:
+        pymupdf4llm = None
+
+    if pymupdf4llm is not None:
+        try:
+            text = pymupdf4llm.to_markdown(doc)
+            return text.strip()
+        except Exception:
+            pass
+
+    texts = [page.get_text("text") for page in doc]
+    return "\n".join(texts).strip()
