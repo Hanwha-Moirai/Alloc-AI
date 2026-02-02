@@ -4,7 +4,7 @@ import uuid
 
 import fitz
 
-from pdf.config import settings
+from config import settings
 
 
 def extract_pdf_text(path: Path) -> Tuple[str, int]:

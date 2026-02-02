@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from pdf.controller.routes import router as pdf_router
+from controller.routes import router as pdf_router
 
 
 def create_app() -> FastAPI:
@@ -16,7 +16,7 @@ def create_app() -> FastAPI:
 def run() -> None:
     import uvicorn
 
-    uvicorn.run("pdf.main:create_app", factory=True, host="0.0.0.0", port=8010)
+    uvicorn.run("main:create_app", factory=True, host="0.0.0.0", port=8010)
 
 
 app = create_app()

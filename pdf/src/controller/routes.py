@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.params import File
 
-from pdf.domain.schemas import PdfExtractResponse, PdfIngestResponse
-from pdf.service.pdf_service import extract_pdf_text_from_bytes, upload_pdf_to_s3
+from domain.schemas import PdfExtractResponse, PdfIngestResponse
+from service.pdf_service import extract_pdf_text_from_bytes, upload_pdf_to_s3
 
 router = APIRouter()
 
