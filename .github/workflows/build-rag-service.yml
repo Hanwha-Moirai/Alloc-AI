@@ -10,14 +10,6 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}
 
-env:
-  AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: moirai-rag-service
-  TASK_DEFINITION: moirai-rag-service-task
-  CONTAINER_NAME: moirai-rag-service
-  ECS_SERVICE: moirai-rag-service
-  ECS_CLUSTER: app-ecs-fargate-cluster
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,7 +35,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-northeast-2
 
       - name: ECR login
         id: login-ecr
@@ -52,7 +44,7 @@ jobs:
       - name: 이미지 URI를 구성한다
         id: image
         run: |
-          echo "uri=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" >> "$GITHUB_OUTPUT"
+          echo "uri=${{ steps.login-ecr.outputs.registry }}/moirai-rag-service" >> "$GITHUB_OUTPUT"
 
       - name: buildx를 설정한다
         uses: docker/setup-buildx-action@v3
@@ -89,12 +81,12 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-northeast-2
 
       - name: ECS 태스크 정의를 다운로드한다
         run: |
           aws ecs describe-task-definition \
-            --task-definition ${{ env.TASK_DEFINITION }} \
+            --task-definition moirai-rag-service-task \
             --query taskDefinition \
           | jq 'del(
               .taskDefinitionArn,
@@ -111,19 +103,19 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
+          container-name: moirai-rag-service
           image: ${{ needs.build.outputs.img-uri }}:${{ needs.build.outputs.img-tag }}
 
       - name: ECS 서비스를 배포한다
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
+          service: moirai-rag-service
+          cluster: app-ecs-fargate-cluster
           wait-for-service-stability: true
 
       - name: 배포 완료
         run: |
           echo "# ECS 배포 완료" >> $GITHUB_STEP_SUMMARY
-          echo "서비스: ${{ env.ECS_SERVICE }}" >> $GITHUB_STEP_SUMMARY
+          echo "서비스: moirai-rag-service" >> $GITHUB_STEP_SUMMARY
           echo "이미지: ${{ needs.build.outputs.img-uri }}:${{ needs.build.outputs.img-tag }}" >> $GITHUB_STEP_SUMMARY
