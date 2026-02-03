@@ -61,7 +61,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.IMG_URI }}:cache
           context: rag
           file: rag/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64
 
       - name: 이미지 태그를 출력한다
         env:
