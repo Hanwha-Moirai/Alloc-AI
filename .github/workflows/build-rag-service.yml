@@ -1,0 +1,129 @@
+name: Build & Deploy rag service
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: moirai-rag-service
+  TASK_DEFINITION: moirai-rag-service-task
+  CONTAINER_NAME: moirai-rag-service
+  ECS_SERVICE: moirai-rag-service
+  ECS_CLUSTER: app-ecs-fargate-cluster
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      img-tag: ${{ steps.tag.outputs.this }}
+      img-uri: ${{ steps.image.outputs.uri }}
+
+    steps:
+      - name: 컨테이너 tag 를 생성한다
+        id: tag
+        run: >-
+          echo "this=$(date +'%y%m%d%H%M')-${GITHUB_SHA:0:4}"
+          >> "$GITHUB_OUTPUT"
+
+      - name: 코드를 받아온다
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: AWS credentials 를 구성한다
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECR login
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 이미지 URI를 구성한다
+        id: image
+        run: |
+          echo "uri=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}" >> "$GITHUB_OUTPUT"
+
+      - name: buildx를 설정한다
+        uses: docker/setup-buildx-action@v3
+
+      - name: 컨테이너 이미지를 빌드하고 푸시한다
+        env:
+          IMG_URI: ${{ steps.image.outputs.uri }}
+          IMG_TAG: ${{ steps.tag.outputs.this }}
+        uses: docker/build-push-action@v4
+        with:
+          tags: ${{ env.IMG_URI }}:${{ env.IMG_TAG }}
+          push: true
+          cache-to: type=registry,ref=${{ env.IMG_URI }}:cache,mode=max
+          cache-from: type=registry,ref=${{ env.IMG_URI }}:cache
+          context: rag
+          file: rag/Dockerfile
+          platforms: linux/arm64
+
+      - name: 이미지 태그를 출력한다
+        env:
+          IMG_URI: ${{ steps.image.outputs.uri }}
+          IMG_TAG: ${{ steps.tag.outputs.this }}
+        run: |
+          echo "# 이미지 빌드 완료" >> $GITHUB_STEP_SUMMARY
+          echo "image: \`${{ env.IMG_URI }}:${{ env.IMG_TAG }}\`" >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: AWS credentials 를 구성한다
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: ECS 태스크 정의를 다운로드한다
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEFINITION }} \
+            --query taskDefinition \
+          | jq 'del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )' > task-definition.json
+
+      - name: 새로운 이미지로 태스크 정의를 업데이트한다
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build.outputs.img-uri }}:${{ needs.build.outputs.img-tag }}
+
+      - name: ECS 서비스를 배포한다
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: 배포 완료
+        run: |
+          echo "# ECS 배포 완료" >> $GITHUB_STEP_SUMMARY
+          echo "서비스: ${{ env.ECS_SERVICE }}" >> $GITHUB_STEP_SUMMARY
+          echo "이미지: ${{ needs.build.outputs.img-uri }}:${{ needs.build.outputs.img-tag }}" >> $GITHUB_STEP_SUMMARY
