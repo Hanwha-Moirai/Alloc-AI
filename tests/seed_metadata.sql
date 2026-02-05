@@ -1,5 +1,133 @@
 USE hawking_test;
 
+CREATE TABLE IF NOT EXISTS project (
+  project_id INT PRIMARY KEY,
+  name VARCHAR(255),
+  start_date DATE,
+  end_date DATE,
+  project_status VARCHAR(50),
+  description TEXT,
+  predicted_cost INT,
+  project_type VARCHAR(50),
+  partners VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS weekly_report (
+  report_id INT PRIMARY KEY,
+  user_id INT,
+  project_id INT,
+  week_start_date DATE,
+  week_end_date DATE,
+  report_status VARCHAR(50),
+  change_of_plan TEXT,
+  summary_text TEXT,
+  task_completion_rate DECIMAL(5,2),
+  is_deleted BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS meeting_record (
+  meeting_id INT PRIMARY KEY,
+  project_id INT,
+  created_by VARCHAR(50),
+  progress DECIMAL(5,2),
+  meeting_date DATETIME,
+  meeting_time DATETIME,
+  is_deleted BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS agenda (
+  agenda_id INT PRIMARY KEY,
+  meeting_id INT,
+  discussion_title VARCHAR(255),
+  discussion_content TEXT,
+  discussion_result TEXT,
+  agenda_type VARCHAR(50)
+);
+
+CREATE TABLE IF NOT EXISTS events (
+  event_id INT PRIMARY KEY,
+  project_id INT,
+  user_id INT,
+  event_name VARCHAR(255),
+  event_state VARCHAR(50),
+  start_date DATETIME,
+  end_date DATETIME,
+  event_type VARCHAR(50),
+  event_place VARCHAR(255),
+  event_description TEXT,
+  is_deleted BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS events_log (
+  event_log_id INT PRIMARY KEY,
+  event_id INT,
+  actor_user_id INT,
+  change_type VARCHAR(50),
+  log_description TEXT,
+  before_start_date DATETIME,
+  after_start_date DATETIME,
+  before_end_date DATETIME,
+  after_end_date DATETIME,
+  created_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS milestone (
+  milestone_id INT PRIMARY KEY,
+  project_id INT,
+  milestone_name VARCHAR(255),
+  start_date DATE,
+  end_date DATE,
+  achievement_rate INT,
+  is_deleted BOOLEAN DEFAULT FALSE,
+  is_completed BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS task (
+  task_id INT PRIMARY KEY,
+  milestone_id INT,
+  user_id INT,
+  task_category VARCHAR(50),
+  task_name VARCHAR(255),
+  task_description TEXT,
+  task_status VARCHAR(50),
+  start_date DATE,
+  end_date DATE,
+  is_completed BOOLEAN DEFAULT FALSE,
+  is_deleted BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS task_update_log (
+  task_update_log_id INT PRIMARY KEY,
+  task_id INT,
+  update_reason TEXT,
+  created_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS milestone_update_log (
+  milestone_update_log_id INT PRIMARY KEY,
+  milestone_id INT,
+  update_reason TEXT,
+  created_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS project_document (
+  doc_id INT PRIMARY KEY,
+  file_path VARCHAR(255),
+  extracted_text TEXT,
+  uploaded_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS risk_analysis (
+  risk_analysis_id INT PRIMARY KEY AUTO_INCREMENT,
+  project_id INT,
+  likelihood INT,
+  impact INT,
+  summary_text TEXT,
+  rationale_text TEXT,
+  citations_json TEXT,
+  created_at DATETIME
+);
+
 DELETE FROM risk_analysis;
 DELETE FROM agenda;
 DELETE FROM meeting_record;
