@@ -3,8 +3,7 @@ from pathlib import Path
 
 from infrastructure.ingestion.chunk import chunk_text
 from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir, load_pdf
-from infrastructure.ingestion.embed import embed_text
-from infrastructure.ingestion.index import index_embeddings
+from infrastructure.langchain_store import upsert_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +12,8 @@ class IngestionService:
     def ingest(self, doc_id: str, text: str, metadata: dict) -> None:
         # 1/2단계: 원문 -> 청크
         chunks = chunk_text(text)
-        # 3단계: 청크 -> 임베딩
-        vectors = embed_text(chunks)
-        # 3단계: 임베딩 -> 벡터 DB 저장
-        index_embeddings(doc_id, chunks, vectors, metadata)
+        # 3단계: 청크 -> 임베딩 -> 벡터 DB 저장 (LangChain VectorStore)
+        upsert_chunks(doc_id, chunks, metadata)
 
     def ingest_data_dir(self, data_dir: str) -> None:
         saw_any = False

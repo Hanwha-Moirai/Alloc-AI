@@ -1,14 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, List
-
-
-@dataclass(frozen=True)
-class SearchResult:
-    doc_id: str
-    score: float
-    text: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+from typing import Dict, List
 
 
 @dataclass(frozen=True)

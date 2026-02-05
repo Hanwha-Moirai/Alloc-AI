@@ -10,8 +10,11 @@ from application.risk_report_parser import RiskReportParser
 from application.risk_report_prompt_builder import RiskReportPromptBuilder
 from application.risk_report_retriever import RiskReportContext, RiskReportRetriever
 from config import settings
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
 from domain.models import RiskAnalysisResult
-from infrastructure.llm_client import LLMClient
+from infrastructure.langchain_llm import get_gemini_llm
 from infrastructure.mariadb_repo import MariaDBRepository
 
 logger = logging.getLogger(__name__)
@@ -23,7 +26,6 @@ class RiskReportService:
         self._retriever = RiskReportRetriever()
         self._prompt_builder = RiskReportPromptBuilder()
         self._parser = RiskReportParser()
-        self._llm = LLMClient()
         self._repo = MariaDBRepository()
 
     def generate(self, *, project_id: str, week_start: date, week_end: date) -> RiskAnalysisResult:
@@ -51,7 +53,8 @@ class RiskReportService:
         logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
         print("[RiskReport] build_prompt done", flush=True)
-        raw = self._llm.generate(prompt)
+        chain = ChatPromptTemplate.from_messages([(\"human\", \"{input}\")]) | get_gemini_llm() | StrOutputParser()
+        raw = chain.invoke({\"input\": prompt})
         t0 = log_step("llm_generate", t0)
         print("[RiskReport] llm_generate done", flush=True)
         parsed = self._parser.parse(raw)

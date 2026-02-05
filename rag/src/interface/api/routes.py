@@ -8,7 +8,7 @@ from fastapi_pagination import Page, Params, create_page
 from application.ingestion_service import IngestionService
 from application.risk_report_service import RiskReportService
 from config import settings
-from infrastructure.qdrant_store import QdrantAdapter
+from infrastructure.qdrant_health import health as qdrant_health
 from interface.api import schemas
 from interface.api.deps import get_ingestion_service, get_risk_report_service
 
@@ -108,9 +108,8 @@ async def upload_pdf(
 
 @router.get("/health/qdrant")
 def health_qdrant() -> dict:
-    adapter = QdrantAdapter()
     try:
-        detail = adapter.health()
+        detail = qdrant_health()
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Qdrant unavailable") from exc
     return {"status": "ok", **detail}

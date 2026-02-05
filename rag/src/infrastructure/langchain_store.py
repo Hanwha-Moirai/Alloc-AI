@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import uuid
+from typing import List, Tuple
+
+from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+from langchain_community.vectorstores import Qdrant
+from langchain_core.documents import Document
+from qdrant_client import QdrantClient
+
+from config import settings
+
+_embeddings: HuggingFaceBgeEmbeddings | None = None
+_client: QdrantClient | None = None
+_vectorstore: Qdrant | None = None
+
+
+def get_embeddings() -> HuggingFaceBgeEmbeddings:
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = HuggingFaceBgeEmbeddings(
+            model_name=settings.embedding_model,
+            encode_kwargs={"normalize_embeddings": settings.embedding_normalize},
+        )
+    return _embeddings
+
+
+def get_qdrant_client() -> QdrantClient:
+    global _client
+    if _client is None:
+        _client = QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
+    return _client
+
+
+def get_vectorstore() -> Qdrant:
+    global _vectorstore
+    if _vectorstore is None:
+        _vectorstore = Qdrant(
+            client=get_qdrant_client(),
+            collection_name=settings.qdrant_collection,
+            embeddings=get_embeddings(),
+        )
+    return _vectorstore
+
+
+def upsert_chunks(doc_id: str, chunks: List[str], metadata: dict) -> None:
+    if not chunks:
+        return
+    metadatas = []
+    ids = []
+    for idx, chunk in enumerate(chunks):
+        payload = {**metadata, "doc_id": doc_id, "chunk_index": idx}
+        metadatas.append(payload)
+        ids.append(str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_id}:{idx}")))
+    client = get_qdrant_client()
+    if not client.collection_exists(settings.qdrant_collection):
+        global _vectorstore
+        _vectorstore = Qdrant.from_texts(
+            texts=chunks,
+            embedding=get_embeddings(),
+            metadatas=metadatas,
+            ids=ids,
+            url=settings.qdrant_url,
+            api_key=settings.qdrant_api_key or None,
+            collection_name=settings.qdrant_collection,
+            distance_func="Cosine",
+        )
+        return
+    vectorstore = get_vectorstore()
+    vectorstore.add_texts(chunks, metadatas=metadatas, ids=ids)
+
+
+def similarity_search_with_score(query: str, k: int) -> List[Tuple[Document, float]]:
+    vectorstore = get_vectorstore()
+    return vectorstore.similarity_search_with_score(query, k=k)

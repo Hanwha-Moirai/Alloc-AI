@@ -7,9 +7,10 @@ from typing import Any, Dict, List
 import logging
 
 from config import settings
-from domain.models import SearchResult
+from langchain_core.documents import Document
+
+from infrastructure.langchain_store import similarity_search_with_score
 from infrastructure.mariadb_repo import MariaDBRepository
-from infrastructure.qdrant_store import QdrantAdapter
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,6 @@ class RiskReportRetriever:
     # 리스크 리포트에 필요한 데이터를 MariaDB/Qdrant에서 수집하는 리트리버
     def __init__(self) -> None:
         self._repo = MariaDBRepository()
-        self._vector = QdrantAdapter()
 
     def fetch(self, *, project_id: str, week_start: date, week_end: date) -> RiskReportContext:
         print("[RiskReport] retriever start", flush=True)
@@ -67,15 +67,16 @@ class RiskReportRetriever:
         query = f"프로젝트 {project_id} 일정 지연 리스크 분석 ({week_start}~{week_end})"
         print(f"[RiskReport] retriever vector_query={query}", flush=True)
         logger.info("RiskReport vector_query=%s top_k=%d", query, settings.top_k)
-        results = self._vector.search(query, k=settings.top_k)
+        results = similarity_search_with_score(query, k=settings.top_k)
         print(f"[RiskReport] retriever vector_search_results={len(results)}", flush=True)
-        return [self._to_evidence(item) for item in results]
+        return [self._to_evidence(doc, score) for doc, score in results]
 
-    def _to_evidence(self, item: SearchResult) -> Dict[str, Any]:
+    def _to_evidence(self, doc: Document, score: float) -> Dict[str, Any]:
+        metadata = doc.metadata or {}
         return {
-            "doc_id": item.doc_id,
-            "score": item.score,
-            "text": item.text,
-            "metadata": item.metadata,
+            "doc_id": metadata.get("doc_id", ""),
+            "score": score,
+            "text": doc.page_content,
+            "metadata": metadata,
         }
 logger = logging.getLogger(__name__)
