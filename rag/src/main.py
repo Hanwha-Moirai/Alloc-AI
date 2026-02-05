@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_pagination import add_pagination
 
 from config import settings
+from interface.api.exceptions import register_exception_handlers
 from interface.api.routes import router as api_router
 
 _repo_root = Path(__file__).resolve().parents[2]
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     if not logging.getLogger().handlers:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     app = FastAPI(title=settings.app_name)
+    register_exception_handlers(app)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
