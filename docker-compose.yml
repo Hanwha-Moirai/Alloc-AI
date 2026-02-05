@@ -15,8 +15,18 @@ services:
       - "8000:8000"
     environment:
       RAG_QDRANT_URL: http://qdrant:6333
+      RAG_PDF_SERVICE_URL: http://pdf:8010
     depends_on:
       - qdrant
+      - pdf
+    restart: unless-stopped
+
+  pdf:
+    build:
+      context: ./pdf
+      dockerfile: Dockerfile
+    ports:
+      - "8010:8010"
     restart: unless-stopped
 
 volumes:
