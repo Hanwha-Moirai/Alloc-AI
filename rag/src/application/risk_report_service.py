@@ -46,17 +46,21 @@ class RiskReportService:
             context = self._apply_test_limits(context, week_start=week_start, week_end=week_end)
             t0 = log_step("apply_test_limits", t0)
             print("[RiskReport] apply_test_limits done", flush=True)
+        # 5단계: 근거/인용 구성
         citations = self._prompt_builder.build_citations(context)
         t0 = log_step("build_citations", t0)
         print("[RiskReport] build_citations done", flush=True)
+        # 5단계: 프롬프트 구성
         prompt = self._prompt_builder.build_prompt(context, citations)
         logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
         print("[RiskReport] build_prompt done", flush=True)
-        chain = ChatPromptTemplate.from_messages([(\"human\", \"{input}\")]) | get_gemini_llm() | StrOutputParser()
-        raw = chain.invoke({\"input\": prompt})
+        # 6단계: LLM 생성
+        chain = ChatPromptTemplate.from_messages([("human", "{input}")]) | get_gemini_llm() | StrOutputParser()
+        raw = chain.invoke({"input": prompt})
         t0 = log_step("llm_generate", t0)
         print("[RiskReport] llm_generate done", flush=True)
+        # 7단계: 결과 파싱/정제
         parsed = self._parser.parse(raw)
         t0 = log_step("parse_json", t0)
         print("[RiskReport] parse_json done", flush=True)
@@ -76,6 +80,7 @@ class RiskReportService:
             generated_at=generated_at,
             citations=citations,
         )
+        # 8단계: 결과 저장
         self._repo.save_risk_analysis(result)
         log_step("save_risk_analysis", t0)
         print("[RiskReport] save_risk_analysis done", flush=True)

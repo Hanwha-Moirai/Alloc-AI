@@ -64,6 +64,7 @@ class RiskReportRetriever:
         )
 
     def _fetch_vector_evidence(self, project_id: str, week_start: date, week_end: date) -> List[Dict[str, Any]]:
+        # 4단계: 벡터 검색 (query -> top_k 청크)
         query = f"프로젝트 {project_id} 일정 지연 리스크 분석 ({week_start}~{week_end})"
         print(f"[RiskReport] retriever vector_query={query}", flush=True)
         logger.info("RiskReport vector_query=%s top_k=%d", query, settings.top_k)
