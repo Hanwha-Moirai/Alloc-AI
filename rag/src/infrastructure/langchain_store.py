@@ -4,7 +4,7 @@ import uuid
 from typing import List, Tuple
 
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
-from langchain_community.vectorstores import Qdrant
+from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 
@@ -12,7 +12,7 @@ from config import settings
 
 _embeddings: HuggingFaceBgeEmbeddings | None = None
 _client: QdrantClient | None = None
-_vectorstore: Qdrant | None = None
+_vectorstore: QdrantVectorStore | None = None
 
 
 def get_embeddings() -> HuggingFaceBgeEmbeddings:
@@ -32,13 +32,13 @@ def get_qdrant_client() -> QdrantClient:
     return _client
 
 
-def get_vectorstore() -> Qdrant:
+def get_vectorstore() -> QdrantVectorStore:
     global _vectorstore
     if _vectorstore is None:
-        _vectorstore = Qdrant(
+        _vectorstore = QdrantVectorStore(
             client=get_qdrant_client(),
             collection_name=settings.qdrant_collection,
-            embeddings=get_embeddings(),
+            embedding=get_embeddings(),
         )
     return _vectorstore
 
@@ -65,7 +65,7 @@ def upsert_chunks(
     client = get_qdrant_client()
     if not client.collection_exists(settings.qdrant_collection):
         global _vectorstore
-        _vectorstore = Qdrant.from_texts(
+        _vectorstore = QdrantVectorStore.from_texts(
             texts=chunks,
             embedding=get_embeddings(),
             metadatas=metadatas,
@@ -73,7 +73,6 @@ def upsert_chunks(
             url=settings.qdrant_url,
             api_key=settings.qdrant_api_key or None,
             collection_name=settings.qdrant_collection,
-            distance_func="Cosine",
         )
         return
     vectorstore = get_vectorstore()
