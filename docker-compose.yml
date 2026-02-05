@@ -5,11 +5,6 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:6333/healthz"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
     restart: unless-stopped
 
   rag:
@@ -21,8 +16,7 @@ services:
     environment:
       RAG_QDRANT_URL: http://qdrant:6333
     depends_on:
-      qdrant:
-        condition: service_healthy
+      - qdrant
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/qdrant"]
       interval: 10s
