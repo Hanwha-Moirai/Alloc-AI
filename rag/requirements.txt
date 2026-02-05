@@ -8,6 +8,7 @@ langchain-community>=0.2
 langchain-huggingface>=0.2
 langchain-google-genai>=1.0
 pypdf>=4.2
+sentence-transformers>=2.7
 qdrant-client>=1.7
 mariadb>=1.1
 sqlalchemy>=2.0
