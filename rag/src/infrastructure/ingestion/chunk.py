@@ -1,6 +1,9 @@
 from typing import List
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:  # pragma: no cover - fallback for older LangChain layouts
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 def chunk_text(text: str, max_chars: int = 800, overlap: int = 120) -> List[str]:
