@@ -24,6 +24,7 @@ class RiskReportPromptBuilder:
             f"[마일스톤 변경 로그]\n{json.dumps(context.milestone_update_logs, ensure_ascii=False, default=str)}\n\n"
             f"[프로젝트 문서]\n{json.dumps(context.project_documents, ensure_ascii=False, default=str)}\n\n"
             f"[벡터 검색 결과]\n{json.dumps(context.vector_evidence, ensure_ascii=False, default=str)}\n\n"
+            f"[리스크 유형 점수]\n{json.dumps(context.risk_type_scores, ensure_ascii=False, default=str)}\n\n"
             f"[참고 문서 목록]\n{json.dumps(citations, ensure_ascii=False, default=str)}\n"
         )
 

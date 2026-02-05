@@ -43,13 +43,23 @@ def get_vectorstore() -> Qdrant:
     return _vectorstore
 
 
-def upsert_chunks(doc_id: str, chunks: List[str], metadata: dict) -> None:
+def upsert_chunks(
+    doc_id: str,
+    chunks: List[str],
+    metadata: dict,
+    *,
+    chunk_keywords: List[List[str]] | None = None,
+) -> None:
     if not chunks:
         return
+    if chunk_keywords is not None and len(chunk_keywords) != len(chunks):
+        raise ValueError("chunk_keywords length must match chunks length.")
     metadatas = []
     ids = []
     for idx, chunk in enumerate(chunks):
         payload = {**metadata, "doc_id": doc_id, "chunk_index": idx}
+        if chunk_keywords is not None:
+            payload["keywords"] = chunk_keywords[idx]
         metadatas.append(payload)
         ids.append(str(uuid.uuid5(uuid.NAMESPACE_URL, f"{doc_id}:{idx}")))
     client = get_qdrant_client()

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from infrastructure.ingestion.chunk import chunk_text
 from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir, load_pdf
+from infrastructure.ingestion.keywords import extract_keywords
 from infrastructure.langchain_store import upsert_chunks
 
 logger = logging.getLogger(__name__)
@@ -12,8 +13,9 @@ class IngestionService:
     def ingest(self, doc_id: str, text: str, metadata: dict) -> None:
         # 2단계: 원문 -> 청크
         chunks = chunk_text(text)
+        chunk_keywords = [extract_keywords(chunk, top_n=10) for chunk in chunks]
         # 3단계: 청크 -> 임베딩 -> 벡터 DB 저장 (LangChain VectorStore)
-        upsert_chunks(doc_id, chunks, metadata)
+        upsert_chunks(doc_id, chunks, metadata, chunk_keywords=chunk_keywords)
 
     def ingest_data_dir(self, data_dir: str) -> None:
         saw_any = False

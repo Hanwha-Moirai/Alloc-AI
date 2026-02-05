@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 import logging
 
 from config import settings
+from application.risk_type_classifier import score_risk_types
 from langchain_core.documents import Document
 
 from infrastructure.langchain_store import similarity_search_with_score
@@ -23,6 +24,7 @@ class RiskReportContext:
     milestone_update_logs: List[Dict[str, Any]]
     project_documents: List[Dict[str, Any]]
     vector_evidence: List[Dict[str, Any]]
+    risk_type_scores: Dict[str, float]
 
 
 class RiskReportRetriever:
@@ -52,6 +54,7 @@ class RiskReportRetriever:
         vector_hits = self._fetch_vector_evidence(project_id, week_start, week_end)
         print(f"[RiskReport] retriever vector_hits={len(vector_hits)}", flush=True)
         logger.info("RiskReport vector_evidence_count=%d", len(vector_hits))
+        risk_type_scores = score_risk_types(self._collect_keywords(vector_hits))
         return RiskReportContext(
             project=project,
             weekly_reports=weekly_reports,
@@ -61,6 +64,7 @@ class RiskReportRetriever:
             milestone_update_logs=milestone_update_logs,
             project_documents=project_documents,
             vector_evidence=vector_hits,
+            risk_type_scores=risk_type_scores,
         )
 
     def _fetch_vector_evidence(self, project_id: str, week_start: date, week_end: date) -> List[Dict[str, Any]]:
@@ -80,4 +84,13 @@ class RiskReportRetriever:
             "text": doc.page_content,
             "metadata": metadata,
         }
+
+    def _collect_keywords(self, items: List[Dict[str, Any]]) -> List[List[str]]:
+        keywords: List[List[str]] = []
+        for item in items:
+            metadata = item.get("metadata") or {}
+            kws = metadata.get("keywords") or []
+            if isinstance(kws, list):
+                keywords.append(kws)
+        return keywords
 logger = logging.getLogger(__name__)
