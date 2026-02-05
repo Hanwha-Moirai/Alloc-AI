@@ -5,6 +5,11 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   rag:
@@ -15,18 +20,14 @@ services:
       - "8000:8000"
     environment:
       RAG_QDRANT_URL: http://qdrant:6333
-      RAG_PDF_SERVICE_URL: http://pdf:8010
     depends_on:
-      - qdrant
-      - pdf
-    restart: unless-stopped
-
-  pdf:
-    build:
-      context: ./pdf
-      dockerfile: Dockerfile
-    ports:
-      - "8010:8010"
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/qdrant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
