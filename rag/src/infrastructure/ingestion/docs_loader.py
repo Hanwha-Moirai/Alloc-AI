@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from typing import Iterable, List
 
-import requests
+from langchain_community.document_loaders import PyPDFLoader
 
-from config import settings
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ def iter_pdfs_from_dir(data_dir: str) -> Iterable[DocumentPayload]:
 
 def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
     print(f"[Loader] open pdf={path}", flush=True)
-    text, page_count = _extract_via_service(path)
+    text, page_count = _extract_via_loader(path)
     rel_path = path.resolve().relative_to(base_dir).as_posix()
     metadata = {
         "source_path": rel_path,
@@ -47,11 +48,13 @@ def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
     return DocumentPayload(doc_id=rel_path, text=text, metadata=metadata)
 
 
-def _extract_via_service(path: Path) -> tuple[str, int]:
-    url = f"{settings.pdf_service_url.rstrip('/')}/pdf/extract"
-    with path.open("rb") as fp:
-        files = {"file": (path.name, fp, "application/pdf")}
-        response = requests.post(url, files=files, timeout=60)
-    response.raise_for_status()
-    payload = response.json()
-    return payload.get("text", ""), int(payload.get("page_count", 0))
+def _extract_via_loader(path: Path) -> tuple[str, int]:
+    try:
+        loader = PyPDFLoader(str(path))
+        pages = loader.load()
+    except Exception as exc:
+        logger.warning("PDF load failed: %s", exc)
+        return "", 0
+    page_count = len(pages)
+    text = "\n\n".join(page.page_content for page in pages if page.page_content)
+    return text, page_count
