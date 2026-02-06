@@ -63,8 +63,8 @@ def _extract_via_loader(path: Path) -> tuple[str, int]:
 
 
 _NOISE_PATTERNS = [
-    re.compile(r"^\s*차\s*례\s*$"),  # table of contents
-    re.compile(r"^\s*목\s*차\s*$"),
+    re.compile(r"^\s*차\s*례.*$"),  # table of contents
+    re.compile(r"^\s*목\s*차.*$"),
     re.compile(r"^\s*제\s*\d+\s*장.*$"),  # chapter headers
     re.compile(r"^\s*제\s*\d+\s*절.*$"),  # section headers
     re.compile(r"^\s*\d+\s*$"),  # page numbers
@@ -81,7 +81,17 @@ def _clean_pdf_text(text: str) -> str:
         stripped = line.strip()
         if not stripped:
             continue
-        if any(pattern.match(stripped) for pattern in _NOISE_PATTERNS):
+        # Normalize whitespace and remove dot leaders often used in TOC.
+        normalized = re.sub(r"\s+", " ", stripped)
+        normalized = re.sub(r"\.{2,}\s*\d*\s*$", "", normalized).strip()
+        if not normalized:
             continue
-        lines.append(stripped)
+        if any(pattern.match(normalized) for pattern in _NOISE_PATTERNS):
+            continue
+        # Drop lines that still look like dense TOC rows.
+        if re.search(r"(차\s*례|목\s*차)", normalized):
+            continue
+        if re.search(r"(제\s*\d+\s*장|제\s*\d+\s*절)", normalized) and re.search(r"\d+$", normalized):
+            continue
+        lines.append(normalized)
     return "\n".join(lines)
