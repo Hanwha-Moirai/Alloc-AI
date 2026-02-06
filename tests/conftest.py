@@ -8,8 +8,8 @@ import requests
 
 
 def _get_db_config() -> tuple[str, int, str, str, str]:
-    host = os.getenv("RAG_TEST_MARIADB_HOST", os.getenv("RAG_MARIADB_HOST", "127.0.0.1"))
-    port = int(os.getenv("RAG_TEST_MARIADB_PORT", os.getenv("RAG_MARIADB_PORT", "3306")))
+    host = os.getenv("RAG_TEST_MARIADB_HOST", "127.0.0.1")
+    port = int(os.getenv("RAG_TEST_MARIADB_PORT", "3306"))
     user = os.getenv("RAG_TEST_MARIADB_USER", os.getenv("RAG_MARIADB_USER"))
     password = os.getenv("RAG_TEST_MARIADB_PASSWORD", os.getenv("RAG_MARIADB_PASSWORD"))
     database = os.getenv("RAG_TEST_MARIADB_DATABASE", os.getenv("RAG_MARIADB_DATABASE"))
