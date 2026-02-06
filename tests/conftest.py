@@ -12,7 +12,7 @@ def _get_db_config() -> tuple[str, int, str, str, str]:
     port = int(os.getenv("RAG_TEST_MARIADB_PORT", "3306"))
     user = os.getenv("RAG_TEST_MARIADB_USER", os.getenv("RAG_MARIADB_USER"))
     password = os.getenv("RAG_TEST_MARIADB_PASSWORD", os.getenv("RAG_MARIADB_PASSWORD"))
-    database = os.getenv("RAG_TEST_MARIADB_DATABASE", os.getenv("RAG_MARIADB_DATABASE"))
+    database = os.getenv("RAG_TEST_MARIADB_DATABASE", os.getenv("RAG_MARIADB_DATABASE", "alloc_test"))
     if not user or not password or not database:
         pytest.skip("Missing MariaDB env vars for test: RAG_MARIADB_USER/PASSWORD/DATABASE")
     return host, port, user, password, database
