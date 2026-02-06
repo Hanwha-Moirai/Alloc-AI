@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import re
 from pathlib import Path
 from typing import Iterable, List
 
@@ -38,7 +39,8 @@ def iter_pdfs_from_dir(data_dir: str) -> Iterable[DocumentPayload]:
 
 def load_pdf(path: Path, base_dir: Path) -> DocumentPayload:
     print(f"[Loader] open pdf={path}", flush=True)
-    text, page_count = _extract_via_loader(path)
+    raw_text, page_count = _extract_via_loader(path)
+    text = _clean_pdf_text(raw_text)
     rel_path = path.resolve().relative_to(base_dir).as_posix()
     metadata = {
         "source_path": rel_path,
@@ -58,3 +60,28 @@ def _extract_via_loader(path: Path) -> tuple[str, int]:
     page_count = len(pages)
     text = "\n\n".join(page.page_content for page in pages if page.page_content)
     return text, page_count
+
+
+_NOISE_PATTERNS = [
+    re.compile(r"^\s*차\s*례\s*$"),  # table of contents
+    re.compile(r"^\s*목\s*차\s*$"),
+    re.compile(r"^\s*제\s*\d+\s*장.*$"),  # chapter headers
+    re.compile(r"^\s*제\s*\d+\s*절.*$"),  # section headers
+    re.compile(r"^\s*\d+\s*$"),  # page numbers
+    re.compile(r"^\s*\d+\s*/\s*\d+\s*$"),  # 1/10 style
+    re.compile(r"^\s*Page\s*\d+\s*$", re.IGNORECASE),
+]
+
+
+def _clean_pdf_text(text: str) -> str:
+    if not text:
+        return ""
+    lines = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(pattern.match(stripped) for pattern in _NOISE_PATTERNS):
+            continue
+        lines.append(stripped)
+    return "\n".join(lines)
