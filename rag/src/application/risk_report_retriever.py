@@ -25,6 +25,7 @@ class RiskReportContext:
     milestone_update_logs: List[Dict[str, Any]]
     project_documents: List[Dict[str, Any]]
     vector_evidence: List[Dict[str, Any]]
+    vector_evidence_by_type: Dict[str, List[Dict[str, Any]]]
     risk_type_scores: Dict[str, float]
     risk_profile: List[Dict[str, Any]]
 
@@ -54,7 +55,7 @@ class RiskReportRetriever:
         project_documents = self._repo.fetch_project_documents(project_id)
         print("[RiskReport] retriever fetch_project_documents done", flush=True)
         risk_profile = self._repo.fetch_risk_profile()
-        vector_hits = self._fetch_vector_evidence(
+        vector_hits, vector_by_type = self._fetch_vector_evidence(
             project_id=project_id,
             week_start=week_start,
             week_end=week_end,
@@ -78,6 +79,7 @@ class RiskReportRetriever:
             milestone_update_logs=milestone_update_logs,
             project_documents=project_documents,
             vector_evidence=vector_hits,
+            vector_evidence_by_type=vector_by_type,
             risk_type_scores=risk_type_scores,
             risk_profile=risk_profile,
         )
@@ -95,7 +97,7 @@ class RiskReportRetriever:
         task_update_logs: List[Dict[str, Any]],
         milestone_update_logs: List[Dict[str, Any]],
         project_documents: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+    ) -> tuple[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
         # 4단계: 벡터 검색 (query -> top_k 청크)
         base = f"프로젝트 {project_id} 일정 지연 리스크 분석 ({week_start}~{week_end})"
         queries = self._build_queries_from_profile(
@@ -109,10 +111,14 @@ class RiskReportRetriever:
             project_documents=project_documents,
         )
         all_results: List[Dict[str, Any]] = []
+        by_type: Dict[str, List[Dict[str, Any]]] = {}
         seen_keys = set()
-        for query in queries:
-            print(f"[RiskReport] retriever vector_query={query} top_k={settings.top_k}", flush=True)
-            logger.info("RiskReport vector_query=%s top_k=%d", query, settings.top_k)
+        for risk_type, query in queries.items():
+            print(
+                f"[RiskReport] retriever vector_query={query} top_k={settings.top_k} risk_type={risk_type}",
+                flush=True,
+            )
+            logger.info("RiskReport vector_query=%s top_k=%d risk_type=%s", query, settings.top_k, risk_type)
             results = similarity_search_with_score(query, k=settings.top_k)
             for doc, score in results:
                 metadata = doc.metadata or {}
@@ -120,9 +126,11 @@ class RiskReportRetriever:
                 if key in seen_keys:
                     continue
                 seen_keys.add(key)
-                all_results.append(self._to_evidence(doc, score))
+                evidence = self._to_evidence(doc, score)
+                all_results.append(evidence)
+                by_type.setdefault(risk_type, []).append(evidence)
         print(f"[RiskReport] retriever vector_search_results={len(all_results)}", flush=True)
-        return all_results
+        return all_results, by_type
 
     def _build_queries_from_profile(
         self,
@@ -135,7 +143,7 @@ class RiskReportRetriever:
         task_update_logs: List[Dict[str, Any]],
         milestone_update_logs: List[Dict[str, Any]],
         project_documents: List[Dict[str, Any]],
-    ) -> List[str]:
+    ) -> Dict[str, str]:
         keywords: List[str] = []
         seed_texts: List[str] = []
         seed_texts.extend(item.get("summary_text", "") for item in weekly_reports)
@@ -149,14 +157,25 @@ class RiskReportRetriever:
             if not text:
                 continue
             keywords.extend(_tokenize_keywords(text))
-        for item in risk_profile or []:
+        queries: Dict[str, str] = {}
+        profile_items = risk_profile or []
+        if not profile_items:
+            unique = _dedupe_keywords(keywords)
+            queries["general"] = f"{base} 핵심 키워드: {' '.join(unique[:12])}" if unique else base
+            return queries
+
+        for item in profile_items:
+            risk_type = str(item.get("risk_type") or "general")
             factors = item.get("factors") or []
+            type_keywords = list(keywords)
             if isinstance(factors, list):
-                keywords.extend([str(factor) for factor in factors])
-        unique = _dedupe_keywords(keywords)
-        if not unique:
-            return [base]
-        return [f"{base} 핵심 키워드: {' '.join(unique[:12])}"]
+                type_keywords.extend([str(factor) for factor in factors])
+            unique = _dedupe_keywords(type_keywords)
+            if unique:
+                queries[risk_type] = f"{base} 유형:{risk_type} 키워드: {' '.join(unique[:12])}"
+            else:
+                queries[risk_type] = f"{base} 유형:{risk_type}"
+        return queries
 
     def _to_evidence(self, doc: Document, score: float) -> Dict[str, Any]:
         metadata = doc.metadata or {}
