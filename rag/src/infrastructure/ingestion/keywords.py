@@ -22,7 +22,10 @@ def extract_keywords(text: str, *, top_n: int = 10) -> List[str]:
         return [token for token, _ in counts.most_common(top_n)]
 
     vectorizer = TfidfVectorizer(tokenizer=_tokenize, token_pattern=None, lowercase=False)
-    matrix = vectorizer.fit_transform(segments)
+    try:
+        matrix = vectorizer.fit_transform(segments)
+    except ValueError:
+        return []
     if matrix.shape[1] == 0:
         return []
     scores = matrix.mean(axis=0).A1
