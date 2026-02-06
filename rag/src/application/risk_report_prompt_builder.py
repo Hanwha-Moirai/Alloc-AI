@@ -12,8 +12,6 @@ class RiskReportPromptBuilder:
         return (
             "너는 IT 프로젝트 리스크 관리 전문가다. 아래 문서들을 근거로 "
             "일정 지연 리스크를 PI 매트릭스(발생 가능성/영향도 1~5)로 평가하라.\n"
-            "사내 리스크 데이터가 충분하지 않아 몬테카를로 대신 정성적 PI 매트릭스를 사용한다.\n"
-            "문서 기반 정성 분석은 LLM이 잘하기 때문에 RAG로 근거를 요약한다.\n\n"
             "응답은 JSON만 출력하고, 다음 키를 포함하라:\n"
             '{"likelihood": 1, "impact": 1, "summary": "...", "rationale": "..."}\n\n'
             f"[프로젝트 메타]\n{json.dumps(context.project, ensure_ascii=False, default=str)}\n\n"
