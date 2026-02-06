@@ -17,8 +17,10 @@ services:
       - .env
     environment:
       RAG_QDRANT_URL: http://qdrant:6333
+      RAG_MARIADB_HOST: mariadb
     depends_on:
       - qdrant
+      - mariadb
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/qdrant"]
       interval: 10s
@@ -26,5 +28,19 @@ services:
       retries: 5
     restart: unless-stopped
 
+  mariadb:
+    image: mariadb:10.6
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_DATABASE: ${RAG_MARIADB_DATABASE}
+      MARIADB_USER: ${RAG_MARIADB_USER}
+      MARIADB_PASSWORD: ${RAG_MARIADB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${RAG_MARIADB_ROOT_PASSWORD:-root}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
+  mariadb_data:
