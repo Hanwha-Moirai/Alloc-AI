@@ -5,11 +5,16 @@ from infrastructure.ingestion.chunk import chunk_text
 from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir, load_pdf
 from infrastructure.ingestion.keywords import extract_keywords
 from infrastructure.langchain_store import upsert_chunks
+from infrastructure.mariadb_repo import MariaDBRepository
+from application.type_extraction import extract_risk_profile
 
 logger = logging.getLogger(__name__)
 
 
 class IngestionService:
+    def __init__(self) -> None:
+        self._repo = MariaDBRepository()
+
     def ingest(self, doc_id: str, text: str, metadata: dict) -> None:
         # 2단계: 원문 -> 청크
         chunks = chunk_text(text)
@@ -41,6 +46,16 @@ class IngestionService:
             print(f"[Ingestion] empty text file={file_path}", flush=True)
             logger.warning("Empty PDF text extracted: %s", file_path)
             return
+        # Extract risk profile (types + factors) from PDF and persist for later use.
+        try:
+            profile = extract_risk_profile(payload.text)
+            if profile:
+                self._repo.upsert_risk_profile(
+                    doc_id=payload.doc_id,
+                    risk_profile=profile,
+                )
+        except Exception as exc:
+            logger.warning("Failed to extract risk profile: %s", exc)
         print(f"[Ingestion] extracted chars={len(payload.text)} file={file_path}", flush=True)
         self.ingest(payload.doc_id, payload.text, payload.metadata)
         print(f"[Ingestion] upsert done doc_id={payload.doc_id}", flush=True)

@@ -123,6 +123,47 @@ class MariaDBRepository:
         sql = "SELECT doc_id, file_path, extracted_text, uploaded_at FROM project_document"
         return self._query(sql, {})
 
+    def fetch_risk_profile(self) -> List[Dict[str, Any]]:
+        sql = "SELECT risk_type, factors_json, source_doc_id, extracted_at FROM project_risk_profile"
+        try:
+            return self._query(sql, {})
+        except Exception:
+            return []
+
+    def upsert_risk_profile(self, *, doc_id: str, risk_profile: List[Dict[str, Any]]) -> None:
+        self._ensure_risk_profile_table()
+        sql = (
+            "INSERT INTO project_risk_profile (risk_type, factors_json, source_doc_id, extracted_at) "
+            "VALUES (:risk_type, :factors_json, :source_doc_id, NOW())"
+        )
+        for item in risk_profile:
+            try:
+                self._execute(
+                    sql,
+                    {
+                        "risk_type": str(item.get("risk_type") or ""),
+                        "factors_json": json.dumps(item.get("factors") or [], ensure_ascii=False),
+                        "source_doc_id": doc_id,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("Failed to upsert risk profile: %s", exc)
+
+    def _ensure_risk_profile_table(self) -> None:
+        sql = (
+            "CREATE TABLE IF NOT EXISTS project_risk_profile ("
+            "  risk_profile_id INT PRIMARY KEY AUTO_INCREMENT,"
+            "  risk_type VARCHAR(50) NOT NULL,"
+            "  factors_json TEXT,"
+            "  source_doc_id VARCHAR(255),"
+            "  extracted_at DATETIME"
+            ")"
+        )
+        try:
+            self._execute(sql, {}, fetch=False)
+        except Exception as exc:
+            logger.warning("Failed to ensure risk profile table: %s", exc)
+
     def save_risk_analysis(self, result: RiskAnalysisResult) -> None:
         sql = (
             "INSERT INTO risk_analysis (project_id, likelihood, impact, summary_text, rationale_text, "

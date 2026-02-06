@@ -128,6 +128,14 @@ CREATE TABLE IF NOT EXISTS risk_analysis (
   created_at DATETIME
 );
 
+CREATE TABLE IF NOT EXISTS project_risk_profile (
+  risk_profile_id INT PRIMARY KEY AUTO_INCREMENT,
+  risk_type VARCHAR(50) NOT NULL,
+  factors_json TEXT,
+  source_doc_id VARCHAR(255),
+  extracted_at DATETIME
+);
+
 DELETE FROM risk_analysis;
 DELETE FROM agenda;
 DELETE FROM meeting_record;
