@@ -1,5 +1,6 @@
 services:
   qdrant:
+    # 벡터 검색용 Qdrant 서비스
     image: qdrant/qdrant:latest
     ports:
       - "6333:6333"
@@ -8,6 +9,7 @@ services:
     restart: unless-stopped
 
   rag:
+    # RAG API 서버 (FastAPI)
     build:
       context: ./rag
       dockerfile: Dockerfile
