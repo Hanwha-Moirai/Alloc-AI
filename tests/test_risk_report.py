@@ -4,7 +4,7 @@ import pytest
 
 
 def test_risk_report_generate(seeded_db, api_base_url, api_request) -> None:
-    upload_path = Path(__file__).with_name("samples") / "software_development_process_guide.pdf"
+    upload_path = Path(__file__).with_name("samples") / "ISO310000_sample.pdf"
     if upload_path.exists():
         with upload_path.open("rb") as fp:
             files = {"file": (upload_path.name, fp, "application/pdf")}
