@@ -22,7 +22,7 @@ services:
     depends_on:
       - qdrant
     volumes:
-      - /certs/global-bundle.pem:/certs/global-bundle.pem:ro
+      - ./certs/ap-northeast-2-bundle.pem:/certs/ap-northeast-2-bundle.pem:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8000/health/qdrant"]
       interval: 10s
