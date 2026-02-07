@@ -284,7 +284,18 @@ class MariaDBRepository:
 
     def _get_engine(self) -> Engine:
         if MariaDBRepository._engine is None:
-            MariaDBRepository._engine = create_engine(self.dsn, pool_pre_ping=True)
+            # SSL 옵션을 넘기기 위한 연결 파라미터 초기화
+            connect_args: Dict[str, Any] = {}
+            # CA 경로가 설정된 경우에만 SSL 검증 옵션을 활성화
+            if settings.mariadb_ssl_ca:
+                connect_args["ssl_ca"] = settings.mariadb_ssl_ca
+                connect_args["ssl_verify_cert"] = settings.mariadb_ssl_verify
+            MariaDBRepository._engine = create_engine(
+                self.dsn,
+                pool_pre_ping=True,
+                # SSL 옵션이 없으면 기본 연결, 있으면 SSL 적용
+                connect_args=connect_args if connect_args else None,
+            )
         return MariaDBRepository._engine
 
     def _ensure_credentials(self) -> None:

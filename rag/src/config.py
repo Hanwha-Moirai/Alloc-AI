@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     mariadb_user: str = ""
     mariadb_password: str = ""
     mariadb_database: str = ""
+    # MariaDB SSL
+    # RDS 등에서 SSL을 강제하는 경우 CA 인증서 경로를 지정 필요
+    # 예: /certs/global-bundle.pem (컨테이너 환경이면 볼륨 마운트 필요)
+    mariadb_ssl_ca: str = ""
+    # 서버 인증서 검증 여부 (운영 환경에서는 True 권장)
+    mariadb_ssl_verify: bool = True
 
 
 settings = Settings()
