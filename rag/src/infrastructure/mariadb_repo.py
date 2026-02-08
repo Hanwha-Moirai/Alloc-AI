@@ -364,7 +364,7 @@ class MariaDBRepository:
                 self.dsn,
                 pool_pre_ping=True,
                 # SSL 옵션이 없으면 기본 연결, 있으면 SSL 적용
-                connect_args=connect_args if connect_args else None,
+                connect_args=connect_args,
             )
         return MariaDBRepository._engine
 
