@@ -86,9 +86,9 @@ def get_risk_report(
 
 @router.post("/upload/pdf", status_code=status.HTTP_202_ACCEPTED)
 async def upload_pdf(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     service: IngestionService = Depends(get_ingestion_service),
-    background_tasks: BackgroundTasks,
 ) -> dict:
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename.")
@@ -121,3 +121,9 @@ def health_qdrant() -> dict:
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Qdrant unavailable") from exc
     return {"status": "ok", **detail}
+
+
+@router.get("/health")
+def health_basic() -> dict:
+    # ELB 헬스 체크용: 외부 의존성 없이 즉시 200 응답
+    return {"status": "ok"}
