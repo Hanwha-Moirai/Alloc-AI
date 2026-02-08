@@ -15,6 +15,15 @@ class IngestionService:
     def __init__(self) -> None:
         self._repo = MariaDBRepository()
 
+    def register_pdf_upload(self, *, doc_id: str, file_name: str, file_path: str) -> None:
+        # 업로드 직후 상태는 PROCESSING 으로 저장
+        self._repo.create_pdf_document(
+            doc_id=doc_id,
+            file_name=file_name,
+            file_path=file_path,
+            upload_status="PROCESSING",
+        )
+
     def ingest(self, doc_id: str, text: str, metadata: dict) -> None:
         # 2단계: 원문 -> 청크
         chunks = chunk_text(text)
@@ -41,21 +50,39 @@ class IngestionService:
 
     def ingest_pdf_file(self, file_path: Path, base_dir: Path) -> None:
         print(f"[Ingestion] start file={file_path}", flush=True)
-        payload = load_pdf(file_path, base_dir)
-        if not payload.text:
-            print(f"[Ingestion] empty text file={file_path}", flush=True)
-            logger.warning("Empty PDF text extracted: %s", file_path)
-            return
-        # Extract risk profile (types + factors) from PDF and persist for later use.
         try:
-            profile = extract_risk_profile(payload.text)
-            if profile:
-                self._repo.upsert_risk_profile(
+            payload = load_pdf(file_path, base_dir)
+            if not payload.text:
+                print(f"[Ingestion] empty text file={file_path}", flush=True)
+                logger.warning("Empty PDF text extracted: %s", file_path)
+                self._repo.update_pdf_document_status(
                     doc_id=payload.doc_id,
-                    risk_profile=profile,
+                    upload_status="FAILED",
                 )
+                return
+            # Extract risk profile (types + factors) from PDF and persist for later use.
+            try:
+                profile = extract_risk_profile(payload.text)
+                if profile:
+                    self._repo.upsert_risk_profile(
+                        doc_id=payload.doc_id,
+                        risk_profile=profile,
+                    )
+            except Exception as exc:
+                logger.warning("Failed to extract risk profile: %s", exc)
+            print(f"[Ingestion] extracted chars={len(payload.text)} file={file_path}", flush=True)
+            self.ingest(payload.doc_id, payload.text, payload.metadata)
+            self._repo.update_pdf_document_status(
+                doc_id=payload.doc_id,
+                upload_status="SUCCESS",
+            )
+            print(f"[Ingestion] upsert done doc_id={payload.doc_id}", flush=True)
         except Exception as exc:
-            logger.warning("Failed to extract risk profile: %s", exc)
-        print(f"[Ingestion] extracted chars={len(payload.text)} file={file_path}", flush=True)
-        self.ingest(payload.doc_id, payload.text, payload.metadata)
-        print(f"[Ingestion] upsert done doc_id={payload.doc_id}", flush=True)
+            logger.exception("PDF ingestion failed: %s", exc)
+            try:
+                self._repo.update_pdf_document_status(
+                    doc_id=file_path.name,
+                    upload_status="FAILED",
+                )
+            except Exception:
+                logger.warning("Failed to update pdf_document status for %s", file_path.name)

@@ -117,6 +117,18 @@ CREATE TABLE IF NOT EXISTS project_document (
   uploaded_at DATETIME
 );
 
+CREATE TABLE IF NOT EXISTS pdf_document (
+  pdf_document_id INT PRIMARY KEY AUTO_INCREMENT,
+  doc_id VARCHAR(255) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  file_path TEXT NOT NULL,
+  summary_text TEXT,
+  upload_status VARCHAR(20) NOT NULL,
+  uploaded_at DATETIME,
+  updated_at DATETIME,
+  UNIQUE KEY uq_pdf_document_doc_id (doc_id)
+);
+
 CREATE TABLE IF NOT EXISTS risk_analysis (
   risk_analysis_id INT PRIMARY KEY AUTO_INCREMENT,
   project_id INT,
@@ -147,6 +159,7 @@ DELETE FROM task;
 DELETE FROM milestone_update_log;
 DELETE FROM milestone;
 DELETE FROM project_document;
+DELETE FROM pdf_document;
 DELETE FROM project;
 
 INSERT INTO project (

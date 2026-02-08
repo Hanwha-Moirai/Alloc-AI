@@ -187,6 +187,76 @@ class MariaDBRepository:
         except Exception as exc:
             logger.warning("Failed to save risk analysis result: %s", exc)
 
+    def create_pdf_document(
+        self,
+        *,
+        doc_id: str,
+        file_name: str,
+        file_path: str,
+        upload_status: str,
+    ) -> None:
+        self._ensure_pdf_document_table()
+        sql = (
+            "INSERT INTO pdf_document (doc_id, file_name, file_path, upload_status, uploaded_at, updated_at) "
+            "VALUES (:doc_id, :file_name, :file_path, :upload_status, NOW(), NOW())"
+        )
+        try:
+            self._execute(
+                sql,
+                {
+                    "doc_id": doc_id,
+                    "file_name": file_name,
+                    "file_path": file_path,
+                    "upload_status": upload_status,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to create pdf_document: %s", exc)
+
+    def update_pdf_document_status(
+        self,
+        *,
+        doc_id: str,
+        upload_status: str,
+        summary_text: str | None = None,
+    ) -> None:
+        self._ensure_pdf_document_table()
+        sql = (
+            "UPDATE pdf_document "
+            "SET upload_status = :upload_status, summary_text = :summary_text, updated_at = NOW() "
+            "WHERE doc_id = :doc_id"
+        )
+        try:
+            self._execute(
+                sql,
+                {
+                    "doc_id": doc_id,
+                    "upload_status": upload_status,
+                    "summary_text": summary_text,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to update pdf_document status: %s", exc)
+
+    def _ensure_pdf_document_table(self) -> None:
+        sql = (
+            "CREATE TABLE IF NOT EXISTS pdf_document ("
+            "  pdf_document_id INT PRIMARY KEY AUTO_INCREMENT,"
+            "  doc_id VARCHAR(255) NOT NULL,"
+            "  file_name VARCHAR(255) NOT NULL,"
+            "  file_path TEXT NOT NULL,"
+            "  summary_text TEXT,"
+            "  upload_status VARCHAR(20) NOT NULL,"
+            "  uploaded_at DATETIME,"
+            "  updated_at DATETIME,"
+            "  UNIQUE KEY uq_pdf_document_doc_id (doc_id)"
+            ")"
+        )
+        try:
+            self._execute(sql, {}, fetch=False)
+        except Exception as exc:
+            logger.warning("Failed to ensure pdf_document table: %s", exc)
+
     def fetch_risk_analysis_summaries(self, project_id: str, limit: int, offset: int) -> List[Dict[str, Any]]:
         sql = (
             "SELECT ra.risk_analysis_id, ra.project_id, p.name AS project_name, "

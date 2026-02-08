@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
 from fastapi.params import File
 from fastapi_pagination import Page, Params, create_page
 
@@ -84,10 +84,11 @@ def get_risk_report(
     )
 
 
-@router.post("/upload/pdf")
+@router.post("/upload/pdf", status_code=status.HTTP_202_ACCEPTED)
 async def upload_pdf(
     file: UploadFile = File(...),
     service: IngestionService = Depends(get_ingestion_service),
+    background_tasks: BackgroundTasks,
 ) -> dict:
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing filename.")
@@ -102,8 +103,15 @@ async def upload_pdf(
     content = await file.read()
     target_path.write_bytes(content)
     print(f"[Upload] saved path={target_path}", flush=True)
-    service.ingest_pdf_file(target_path, data_dir)
-    return {"status": "ok", "path": str(target_path)}
+    # 업로드 메타데이터를 즉시 저장하고, 처리는 백그라운드에서 수행
+    service.register_pdf_upload(
+        doc_id=safe_name,
+        file_name=safe_name,
+        file_path=str(target_path),
+    )
+    # 업로드는 즉시 응답하고, 파싱/청킹/임베딩 적재는 백그라운드에서 처리
+    background_tasks.add_task(service.ingest_pdf_file, target_path, data_dir)
+    return {"status": "accepted", "doc_id": safe_name, "path": str(target_path)}
 
 
 @router.get("/health/qdrant")
