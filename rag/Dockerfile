@@ -19,6 +19,7 @@ COPY requirements.txt /app/rag/
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+COPY certs /app/rag/certs
 COPY src /app/rag/src
 
 EXPOSE 8000
