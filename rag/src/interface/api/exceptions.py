@@ -8,10 +8,23 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from infrastructure.langchain_store import QdrantCollectionMissing
+
 logger = logging.getLogger(__name__)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(QdrantCollectionMissing)
+    async def qdrant_collection_missing_handler(request: Request, exc: QdrantCollectionMissing) -> JSONResponse:
+        _ = request
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": "qdrant_collection_missing",
+                "message": "벡터 컬렉션이 비어 있습니다. PDF를 먼저 업로드해 주세요.",
+            },
+        )
+
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         _ = request

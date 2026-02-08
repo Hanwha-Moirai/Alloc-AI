@@ -15,6 +15,10 @@ _client: QdrantClient | None = None
 _vectorstore: QdrantVectorStore | None = None
 
 
+class QdrantCollectionMissing(Exception):
+    pass
+
+
 def get_embeddings() -> HuggingFaceBgeEmbeddings:
     global _embeddings
     if _embeddings is None:
@@ -80,5 +84,10 @@ def upsert_chunks(
 
 
 def similarity_search_with_score(query: str, k: int) -> List[Tuple[Document, float]]:
+    client = get_qdrant_client()
+    if not client.collection_exists(settings.qdrant_collection):
+        raise QdrantCollectionMissing(
+            f"Qdrant collection not found: {settings.qdrant_collection}"
+        )
     vectorstore = get_vectorstore()
     return vectorstore.similarity_search_with_score(query, k=k)
