@@ -123,24 +123,33 @@ class MariaDBRepository:
         sql = "SELECT doc_id, file_path, extracted_text, uploaded_at FROM project_document"
         return self._query(sql, {})
 
-    def fetch_risk_profile(self) -> List[Dict[str, Any]]:
-        sql = "SELECT risk_type, factors_json, source_doc_id, extracted_at FROM project_risk_profile"
+    def fetch_risk_profile(self, *, project_id: str | None = None) -> List[Dict[str, Any]]:
+        if project_id:
+            sql = (
+                "SELECT risk_type, factors_json, source_doc_id, extracted_at "
+                "FROM project_risk_profile WHERE project_id = :project_id"
+            )
+            params = {"project_id": project_id}
+        else:
+            sql = "SELECT risk_type, factors_json, source_doc_id, extracted_at FROM project_risk_profile"
+            params = {}
         try:
-            return self._query(sql, {})
+            return self._query(sql, params)
         except Exception:
             return []
 
-    def upsert_risk_profile(self, *, doc_id: str, risk_profile: List[Dict[str, Any]]) -> None:
+    def upsert_risk_profile(self, *, doc_id: str, project_id: str | None, risk_profile: List[Dict[str, Any]]) -> None:
         self._ensure_risk_profile_table()
         sql = (
-            "INSERT INTO project_risk_profile (risk_type, factors_json, source_doc_id, extracted_at) "
-            "VALUES (:risk_type, :factors_json, :source_doc_id, NOW())"
+            "INSERT INTO project_risk_profile (project_id, risk_type, factors_json, source_doc_id, extracted_at) "
+            "VALUES (:project_id, :risk_type, :factors_json, :source_doc_id, NOW())"
         )
         for item in risk_profile:
             try:
                 self._execute(
                     sql,
                     {
+                        "project_id": project_id,
                         "risk_type": str(item.get("risk_type") or ""),
                         "factors_json": json.dumps(item.get("factors") or [], ensure_ascii=False),
                         "source_doc_id": doc_id,
@@ -153,6 +162,7 @@ class MariaDBRepository:
         sql = (
             "CREATE TABLE IF NOT EXISTS project_risk_profile ("
             "  risk_profile_id INT PRIMARY KEY AUTO_INCREMENT,"
+            "  project_id VARCHAR(50),"
             "  risk_type VARCHAR(50) NOT NULL,"
             "  factors_json TEXT,"
             "  source_doc_id VARCHAR(255),"
@@ -256,6 +266,36 @@ class MariaDBRepository:
             self._execute(sql, {}, fetch=False)
         except Exception as exc:
             logger.warning("Failed to ensure pdf_document table: %s", exc)
+
+    def fetch_pdf_documents(self) -> List[Dict[str, Any]]:
+        self._ensure_pdf_document_table()
+        sql = (
+            "SELECT doc_id, file_name, summary_text, upload_status, uploaded_at "
+            "FROM pdf_document "
+            "ORDER BY uploaded_at DESC"
+        )
+        return self._query(sql, {})
+
+    def fetch_risk_type_summary(self, *, project_id: str | None = None) -> List[Dict[str, Any]]:
+        self._ensure_risk_profile_table()
+        if project_id:
+            sql = (
+                "SELECT risk_type, COUNT(*) AS cnt "
+                "FROM project_risk_profile "
+                "WHERE project_id = :project_id "
+                "GROUP BY risk_type "
+                "ORDER BY cnt DESC"
+            )
+            params = {"project_id": project_id}
+        else:
+            sql = (
+                "SELECT risk_type, COUNT(*) AS cnt "
+                "FROM project_risk_profile "
+                "GROUP BY risk_type "
+                "ORDER BY cnt DESC"
+            )
+            params = {}
+        return self._query(sql, params)
 
     def fetch_risk_analysis_summaries(self, project_id: str, limit: int, offset: int) -> List[Dict[str, Any]]:
         sql = (

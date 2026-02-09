@@ -1,7 +1,9 @@
 import logging
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
+from fastapi.params import Form
 from fastapi.params import File
 from fastapi_pagination import Page, Params, create_page
 
@@ -84,10 +86,29 @@ def get_risk_report(
     )
 
 
+@router.get(
+    "/api/projects/{project_id}/docs/risk_types",
+    response_model=list[schemas.RiskTypeSummaryItem],
+)
+def get_risk_type_summary(
+    project_id: str,
+    service: RiskReportService = Depends(get_risk_report_service),
+) -> list[schemas.RiskTypeSummaryItem]:
+    items = service.risk_type_summary(project_id=project_id)
+    return [
+        schemas.RiskTypeSummaryItem(
+            risk_type=str(item.get("risk_type") or ""),
+            count=int(item.get("cnt") or 0),
+        )
+        for item in items
+    ]
+
+
 @router.post("/upload/pdf", status_code=status.HTTP_202_ACCEPTED)
 async def upload_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    project_id: str | None = Form(default=None),
     service: IngestionService = Depends(get_ingestion_service),
 ) -> dict:
     if not file.filename:
@@ -100,18 +121,41 @@ async def upload_pdf(
     data_dir.mkdir(parents=True, exist_ok=True)
     safe_name = Path(file.filename).name
     target_path = data_dir / safe_name
-    content = await file.read()
-    target_path.write_bytes(content)
+    # 파일 저장을 스트리밍으로 처리해서 메모리 사용/응답 지연을 줄임
+    with target_path.open("wb") as out_file:
+        file.file.seek(0)
+        shutil.copyfileobj(file.file, out_file)
     print(f"[Upload] saved path={target_path}", flush=True)
-    # 업로드 메타데이터를 즉시 저장하고, 처리는 백그라운드에서 수행
-    service.register_pdf_upload(
-        doc_id=safe_name,
-        file_name=safe_name,
-        file_path=str(target_path),
-    )
-    # 업로드는 즉시 응답하고, 파싱/청킹/임베딩 적재는 백그라운드에서 처리
-    background_tasks.add_task(service.ingest_pdf_file, target_path, data_dir)
+
+    def _background_ingest() -> None:
+        # 업로드 기록 저장 및 파싱/청킹/임베딩 적재를 백그라운드로 이동
+        service.register_pdf_upload(
+            doc_id=safe_name,
+            file_name=safe_name,
+            file_path=str(target_path),
+        )
+        service.ingest_pdf_file(target_path, data_dir, project_id=project_id)
+
+    # 업로드는 즉시 응답하고, 이후 처리는 백그라운드에서 수행
+    background_tasks.add_task(_background_ingest)
     return {"status": "accepted", "doc_id": safe_name, "path": str(target_path)}
+
+
+@router.get("/api/docs/pdf", response_model=list[schemas.PdfDocumentListItem])
+def list_pdf_documents(
+    service: IngestionService = Depends(get_ingestion_service),
+) -> list[schemas.PdfDocumentListItem]:
+    items = service.list_pdf_documents()
+    return [
+        schemas.PdfDocumentListItem(
+            doc_id=str(item.get("doc_id") or ""),
+            file_name=str(item.get("file_name") or ""),
+            upload_status=str(item.get("upload_status") or ""),
+            uploaded_at=item.get("uploaded_at"),
+            summary_text=item.get("summary_text"),
+        )
+        for item in items
+    ]
 
 
 @router.get("/health/qdrant")

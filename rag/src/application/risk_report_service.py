@@ -97,6 +97,9 @@ class RiskReportService:
     def get_detail(self, *, project_id: str, report_id: int) -> dict[str, Any] | None:
         return self._repo.fetch_risk_analysis_detail(project_id=project_id, report_id=report_id)
 
+    def risk_type_summary(self, *, project_id: str) -> list[dict[str, Any]]:
+        return self._repo.fetch_risk_type_summary(project_id=project_id)
+
     def _apply_test_limits(
         self, context: RiskReportContext, *, week_start: date, week_end: date
     ) -> RiskReportContext:

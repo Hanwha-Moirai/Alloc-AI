@@ -48,7 +48,7 @@ class IngestionService:
             logger.warning("No PDF files found under data dir: %s", resolved_dir)
         return payloads
 
-    def ingest_pdf_file(self, file_path: Path, base_dir: Path) -> None:
+    def ingest_pdf_file(self, file_path: Path, base_dir: Path, project_id: str | None = None) -> None:
         print(f"[Ingestion] start file={file_path}", flush=True)
         try:
             payload = load_pdf(file_path, base_dir)
@@ -66,6 +66,7 @@ class IngestionService:
                 if profile:
                     self._repo.upsert_risk_profile(
                         doc_id=payload.doc_id,
+                        project_id=project_id,
                         risk_profile=profile,
                     )
             except Exception as exc:
@@ -86,3 +87,6 @@ class IngestionService:
                 )
             except Exception:
                 logger.warning("Failed to update pdf_document status for %s", file_path.name)
+
+    def list_pdf_documents(self) -> list[dict]:
+        return self._repo.fetch_pdf_documents()

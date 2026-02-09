@@ -44,3 +44,16 @@ class RiskReportDetailResponse(BaseModel):
     rationale: str
     generated_at: datetime
     citations: List[RiskCitation]
+
+
+class RiskTypeSummaryItem(BaseModel):
+    risk_type: str
+    count: int
+
+
+class PdfDocumentListItem(BaseModel):
+    doc_id: str
+    file_name: str
+    upload_status: str
+    uploaded_at: datetime | None
+    summary_text: str | None

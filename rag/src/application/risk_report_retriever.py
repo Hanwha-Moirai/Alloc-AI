@@ -54,7 +54,7 @@ class RiskReportRetriever:
         print("[RiskReport] retriever fetch_milestone_update_logs done", flush=True)
         project_documents = self._repo.fetch_project_documents(project_id)
         print("[RiskReport] retriever fetch_project_documents done", flush=True)
-        risk_profile = self._repo.fetch_risk_profile()
+        risk_profile = self._repo.fetch_risk_profile(project_id=project_id)
         vector_hits, vector_by_type = self._fetch_vector_evidence(
             project_id=project_id,
             week_start=week_start,
