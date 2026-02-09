@@ -127,13 +127,15 @@ async def upload_pdf(
         shutil.copyfileobj(file.file, out_file)
     print(f"[Upload] saved path={target_path}", flush=True)
 
+    # 업로드 기록은 즉시 저장해서 문서 관리 목록에 바로 노출
+    service.register_pdf_upload(
+        doc_id=safe_name,
+        file_name=safe_name,
+        file_path=str(target_path),
+    )
+
     def _background_ingest() -> None:
-        # 업로드 기록 저장 및 파싱/청킹/임베딩 적재를 백그라운드로 이동
-        service.register_pdf_upload(
-            doc_id=safe_name,
-            file_name=safe_name,
-            file_path=str(target_path),
-        )
+        # 파싱/청킹/임베딩 적재는 백그라운드에서 수행
         service.ingest_pdf_file(target_path, data_dir, project_id=project_id)
 
     # 업로드는 즉시 응답하고, 이후 처리는 백그라운드에서 수행
