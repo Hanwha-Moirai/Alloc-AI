@@ -87,7 +87,23 @@ def get_risk_report(
 
 
 @router.get(
-    "/api/projects/{project_id}/docs/risk_types",
+    "/api/docs/risk_types",
+    response_model=list[schemas.RiskTypeItem],
+)
+def get_risk_type_master(
+    service: RiskReportService = Depends(get_risk_report_service),
+) -> list[schemas.RiskTypeItem]:
+    items = service.risk_type_master()
+    return [
+        schemas.RiskTypeItem(
+            risk_type=str(item.get("risk_type") or ""),
+        )
+        for item in items
+    ]
+
+
+@router.get(
+    "/api/projects/{project_id}/docs/risk_type_summary",
     response_model=list[schemas.RiskTypeSummaryItem],
 )
 def get_risk_type_summary(
@@ -158,6 +174,16 @@ def list_pdf_documents(
         )
         for item in items
     ]
+
+
+@router.delete("/api/docs/pdf/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_pdf_document(
+    doc_id: str,
+    service: IngestionService = Depends(get_ingestion_service),
+) -> None:
+    deleted = service.delete_pdf_document(doc_id=doc_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF document not found.")
 
 
 @router.get("/health/qdrant")

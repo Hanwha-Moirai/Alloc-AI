@@ -174,6 +174,26 @@ class MariaDBRepository:
         except Exception as exc:
             logger.warning("Failed to ensure risk profile table: %s", exc)
 
+    def _ensure_risk_type_master_table(self) -> None:
+        sql = (
+            "CREATE TABLE IF NOT EXISTS risk_type_master ("
+            "  risk_type_id INT PRIMARY KEY AUTO_INCREMENT,"
+            "  risk_type VARCHAR(255) NOT NULL,"
+            "  created_at DATETIME,"
+            "  updated_at DATETIME,"
+            "  UNIQUE KEY uq_risk_type (risk_type)"
+            ")"
+        )
+        try:
+            self._execute(sql, {}, fetch=False)
+        except Exception as exc:
+            logger.warning("Failed to ensure risk type master table: %s", exc)
+
+    def fetch_risk_type_master(self) -> List[Dict[str, Any]]:
+        self._ensure_risk_type_master_table()
+        sql = "SELECT risk_type FROM risk_type_master ORDER BY risk_type ASC"
+        return self._query(sql, {})
+
     def save_risk_analysis(self, result: RiskAnalysisResult) -> None:
         sql = (
             "INSERT INTO risk_analysis (project_id, likelihood, impact, summary_text, rationale_text, "
@@ -275,6 +295,27 @@ class MariaDBRepository:
             "ORDER BY uploaded_at DESC"
         )
         return self._query(sql, {})
+
+    def fetch_pdf_document(self, *, doc_id: str) -> Dict[str, Any] | None:
+        self._ensure_pdf_document_table()
+        sql = (
+            "SELECT doc_id, file_name, file_path, summary_text, upload_status, uploaded_at "
+            "FROM pdf_document "
+            "WHERE doc_id = :doc_id"
+        )
+        rows = self._query(sql, {"doc_id": doc_id})
+        if not rows:
+            return None
+        return rows[0]
+
+    def delete_pdf_document(self, *, doc_id: str) -> bool:
+        self._ensure_pdf_document_table()
+        sql = "DELETE FROM pdf_document WHERE doc_id = :doc_id"
+        result = self._execute(sql, {"doc_id": doc_id}, fetch=False)
+        try:
+            return bool(getattr(result, "rowcount", 0))
+        except Exception:
+            return False
 
     def fetch_risk_type_summary(self, *, project_id: str | None = None) -> List[Dict[str, Any]]:
         self._ensure_risk_profile_table()

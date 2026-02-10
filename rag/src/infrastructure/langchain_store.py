@@ -7,6 +7,7 @@ from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
+from qdrant_client.http.models import FieldCondition, Filter, MatchValue
 
 from config import settings
 
@@ -91,3 +92,20 @@ def similarity_search_with_score(query: str, k: int) -> List[Tuple[Document, flo
         )
     vectorstore = get_vectorstore()
     return vectorstore.similarity_search_with_score(query, k=k)
+
+
+def delete_doc_chunks(doc_id: str) -> None:
+    client = get_qdrant_client()
+    if not client.collection_exists(settings.qdrant_collection):
+        return
+    client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="doc_id",
+                    match=MatchValue(value=doc_id),
+                )
+            ]
+        ),
+    )

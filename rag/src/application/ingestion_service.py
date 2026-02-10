@@ -4,7 +4,7 @@ from pathlib import Path
 from infrastructure.ingestion.chunk import chunk_text
 from infrastructure.ingestion.docs_loader import DocumentPayload, iter_pdfs_from_dir, load_pdf
 from infrastructure.ingestion.keywords import extract_keywords
-from infrastructure.langchain_store import upsert_chunks
+from infrastructure.langchain_store import delete_doc_chunks, upsert_chunks
 from infrastructure.mariadb_repo import MariaDBRepository
 from application.type_extraction import extract_risk_profile
 
@@ -90,3 +90,19 @@ class IngestionService:
 
     def list_pdf_documents(self) -> list[dict]:
         return self._repo.fetch_pdf_documents()
+
+    def delete_pdf_document(self, *, doc_id: str) -> bool:
+        record = self._repo.fetch_pdf_document(doc_id=doc_id)
+        if record is None:
+            return False
+        file_path = record.get("file_path")
+        try:
+            delete_doc_chunks(doc_id)
+        except Exception as exc:
+            logger.warning("Failed to delete qdrant chunks for %s: %s", doc_id, exc)
+        if file_path:
+            try:
+                Path(file_path).unlink(missing_ok=True)
+            except Exception as exc:
+                logger.warning("Failed to delete pdf file %s: %s", file_path, exc)
+        return self._repo.delete_pdf_document(doc_id=doc_id)

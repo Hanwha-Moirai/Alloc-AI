@@ -51,6 +51,10 @@ class RiskTypeSummaryItem(BaseModel):
     count: int
 
 
+class RiskTypeItem(BaseModel):
+    risk_type: str
+
+
 class PdfDocumentListItem(BaseModel):
     doc_id: str
     file_name: str

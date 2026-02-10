@@ -100,6 +100,9 @@ class RiskReportService:
     def risk_type_summary(self, *, project_id: str) -> list[dict[str, Any]]:
         return self._repo.fetch_risk_type_summary(project_id=project_id)
 
+    def risk_type_master(self) -> list[dict[str, Any]]:
+        return self._repo.fetch_risk_type_master()
+
     def _apply_test_limits(
         self, context: RiskReportContext, *, week_start: date, week_end: date
     ) -> RiskReportContext:
