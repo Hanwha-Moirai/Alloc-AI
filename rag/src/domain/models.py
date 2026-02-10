@@ -8,6 +8,7 @@ class RiskAnalysisResult:
     project_id: str
     likelihood: int
     impact: int
+    risk_type: str | None
     summary: str
     rationale: str
     generated_at: datetime

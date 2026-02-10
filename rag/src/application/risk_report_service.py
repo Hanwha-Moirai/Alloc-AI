@@ -51,7 +51,16 @@ class RiskReportService:
         t0 = log_step("build_citations", t0)
         print("[RiskReport] build_citations done", flush=True)
         # 5단계: 프롬프트 구성
-        prompt = self._prompt_builder.build_prompt(context, citations)
+        risk_type_master = [
+            str(item.get("risk_type") or "")
+            for item in self._repo.fetch_risk_type_master()
+            if item.get("risk_type")
+        ]
+        prompt = self._prompt_builder.build_prompt(
+            context,
+            citations,
+            risk_type_master=risk_type_master,
+        )
         logger.info("RiskReport prompt_preview=%s", prompt[:1000])
         t0 = log_step("build_prompt", t0)
         print("[RiskReport] build_prompt done", flush=True)
@@ -71,8 +80,10 @@ class RiskReportService:
         rationale = str(parsed.get("rationale", "")).strip() or "근거를 생성하지 못했습니다."
 
         generated_at = datetime.now(ZoneInfo("Asia/Seoul"))
+        risk_type = str(parsed.get("risk_type", "")).strip() or None
         result = RiskAnalysisResult(
             project_id=project_id,
+            risk_type=risk_type,
             likelihood=likelihood,
             impact=impact,
             summary=summary,

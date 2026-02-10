@@ -16,6 +16,7 @@ class RiskCitation(BaseModel):
 
 class RiskReportResponse(BaseModel):
     project_id: str
+    risk_type: str | None = None
     likelihood: int
     impact: int
     summary: str
@@ -38,6 +39,7 @@ class RiskReportDetailResponse(BaseModel):
     report_id: int
     project_id: str
     project_name: str
+    risk_type: str | None = None
     summary: str
     likelihood: int
     impact: int

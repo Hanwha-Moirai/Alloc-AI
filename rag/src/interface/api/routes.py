@@ -27,6 +27,7 @@ def generate_risk_report(
     result = service.generate(project_id=project_id, week_start=payload.week_start, week_end=payload.week_end)
     return schemas.RiskReportResponse(
         project_id=project_id,
+        risk_type=result.risk_type,
         likelihood=result.likelihood,
         impact=result.impact,
         summary=result.summary,
@@ -77,6 +78,7 @@ def get_risk_report(
         report_id=result["report_id"],
         project_id=result["project_id"],
         project_name=result["project_name"],
+        risk_type=result.get("risk_type"),
         summary=result["summary"],
         likelihood=result["likelihood"],
         impact=result["impact"],

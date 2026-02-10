@@ -8,12 +8,20 @@ from application.risk_report_retriever import RiskReportContext
 
 class RiskReportPromptBuilder:
     # 리스크 리포트 프롬프트 및 근거(citations) 생성 전담
-    def build_prompt(self, context: RiskReportContext, citations: List[Dict[str, str]]) -> str:
+    def build_prompt(
+        self,
+        context: RiskReportContext,
+        citations: List[Dict[str, str]],
+        *,
+        risk_type_master: List[str],
+    ) -> str:
         return (
             "너는 IT 프로젝트 리스크 관리 전문가다. 아래 문서들을 근거로 "
             "일정 지연 리스크를 PI 매트릭스(발생 가능성/영향도 1~5)로 평가하라.\n"
+            "리스크 유형은 반드시 아래의 공통 리스크 유형 목록 중 하나로 선택하라.\n"
             "응답은 JSON만 출력하고, 다음 키를 포함하라:\n"
-            '{"likelihood": 1, "impact": 1, "summary": "...", "rationale": "..."}\n\n'
+            '{"risk_type": "...", "likelihood": 1, "impact": 1, "summary": "...", "rationale": "..."}\n\n'
+            f"[공통 리스크 유형 목록]\n{json.dumps(risk_type_master, ensure_ascii=False, default=str)}\n\n"
             f"[프로젝트 메타]\n{json.dumps(context.project, ensure_ascii=False, default=str)}\n\n"
             f"[주간 보고]\n{json.dumps(context.weekly_reports, ensure_ascii=False, default=str)}\n\n"
             f"[회의록]\n{json.dumps(context.meeting_records, ensure_ascii=False, default=str)}\n\n"
